@@ -1,0 +1,80 @@
+{
+
+	"pages": [ //pages数组中第一项表示应用启动页，参考：https://uniapp.dcloud.io/collocation/pages
+		{
+			"path": "pages/index/index"
+		
+		},
+		{
+			"path" : "pages/chat/chat"
+			
+		},
+		{
+			"path" : "pages/attention/attention"
+			
+		},
+		{
+			"path" : "pages/upload/upload"
+			
+		},
+		{
+			"path" : "pages/chat/chat"
+			
+		},
+		{
+			"path" : "pages/mime/mime"
+			
+		},
+		{
+			"path" : "pages/loginAndRegister/loginAndRegister",
+			"style" : 
+			{
+				"navigationBarTitleText" : ""
+			}
+		}
+	],
+	
+	"tabBar": {
+		"list": [
+			{
+				"pagePath": "pages/index/index",
+				"text": "首页"
+			},
+			{
+				"pagePath": "pages/attention/attention",
+				"text": "关注"
+			},
+			
+			{
+				"pagePath": "pages/chat/chat",
+				"text": "聊天"
+			},
+			{
+				"pagePath": "pages/mime/mime",
+				"text": "我的"
+			}
+		],
+		"color": "#8f8f94",
+		"selectedColor": "#555555",
+		"fontSize": "18px",
+		"midButton": {
+			"iconPath": "/static/upload.png",
+			"iconWidth": "50px"
+		}
+	},
+	"easycom": {
+	    "autoscan": true,
+	    "custom": {
+	      "^uni-(.*)": "@dcloudio/uni-ui/lib/uni-$1/uni-$1.vue"
+	    }
+	  },
+	"globalStyle": {
+		"navigationBarBackgroundColor": "#F8F8F8",
+		"dynamicRpx": true,
+		"backgroundColor": "#37f8f8",
+		"navigationStyle":"custom",
+		"backgroundColorTop": "#007aff",
+		"navigationBarTitleText": "拟合"
+	},
+	"uniIdRouter": {}
+}
