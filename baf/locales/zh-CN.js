@@ -38,6 +38,9 @@ export default {
 		chat:'聊天',
 		mime:'我的'
 	},
+	upload:{
+		sayAny:'说点什么吧'
+	},
   common: {
     confirm: '确认',
     cancel: '取消',

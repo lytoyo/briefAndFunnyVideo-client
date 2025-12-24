@@ -57,6 +57,7 @@ class HttpRequest {
         return new Promise((resolve, reject) => {
             const requestConfig = this.buildConfig(params)
             this.requestQueue.set(requestId, requestConfig)
+			
             uni.request({
                 ...requestConfig,
                 success: (res) => {
@@ -88,7 +89,7 @@ class HttpRequest {
                 baseHeader[this.authConfig.tokenField] = authHeader
             }
         }
-
+		
         return {
             url: this.baseURL + params.url,
             method: params.method || 'GET',
@@ -326,3 +327,5 @@ class HttpRequest {
 const http = new HttpRequest()
 
 export default http
+
+

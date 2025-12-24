@@ -149,12 +149,16 @@
 				                    icon: 'none'
 				                });
 				                // 存入token
+								console.log(data.token)
 				                http.setToken(data.token);
+								console.log(http.getToken())
 								//存储用户可视数据
 								userStore.saveUserInfo(data.user)
-				                uni.switchTab({
+								
+								uni.switchTab({
 				                    url: '/pages/index/index',
 				                });
+								
 				            }).catch(error => {
 				                uni.showToast({
 				                    title: error.message || this.$t('mime.system404'),
