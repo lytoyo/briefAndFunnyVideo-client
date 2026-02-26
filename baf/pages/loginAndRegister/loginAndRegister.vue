@@ -152,9 +152,11 @@
 				                http.setToken(data.token);
 								//存储用户可视数据
 								userStore.saveUserInfo(data.user)
-				                uni.switchTab({
+								
+								uni.switchTab({
 				                    url: '/pages/index/index',
 				                });
+								
 				            }).catch(error => {
 				                uni.showToast({
 				                    title: error.message || this.$t('mime.system404'),

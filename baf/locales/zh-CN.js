@@ -29,14 +29,29 @@ export default {
 		inputRightEmail:'请输入正确的邮箱地址',
 		registerSuccess:'注册成功',
 		system404:'系统繁忙,请稍后再尝试',
-		welcome:'欢迎回来'
+		welcome:'欢迎回来',
+		noPostContent:'暂未发表任何帖子',
+		postDisplay:'发表的帖子将会在此展示',
+		noLikedContent:'暂无喜欢的内容',
+		likedDisplay:'喜欢的内容将会在此展示',
+		noCollectContent:'暂无收藏的内容',
+		collectDisplay:'收藏的内容将会在此展示',
+		contentdown:'上拉显示更多',
+		contentrefresh:'正在加载...',
+		contentnomore:'———————我也是有底线的———————'
 		
+	},
+	chunkUploader:{
+		uploadBlog:"上传博客"
 	},
 	system:{
 		home:'首页',
 		attention:'关注',
 		chat:'聊天',
 		mime:'我的'
+	},
+	upload:{
+		sayAny:'说点什么吧'
 	},
   common: {
     confirm: '确认',

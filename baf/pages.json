@@ -1,42 +1,109 @@
 {
-
 	"pages": [ //pages数组中第一项表示应用启动页，参考：https://uniapp.dcloud.io/collocation/pages
 		{
-			"path": "pages/index/index"
-		
+			"path": "pages/index/index",
+			"style": {
+				"onReachBottomDistance": 50,
+				"app-plus": {
+					"scrollIndicator": "none"
+				}
+			}
+
 		},
 		{
-			"path" : "pages/chat/chat"
-			
+			"path": "pages/chat/chat",
+			"style": {
+				"app-plus": {
+					"scrollIndicator": "none"
+				}
+			}
+
 		},
 		{
-			"path" : "pages/attention/attention"
-			
+			"path": "pages/attention/attention",
+			"style": {
+				"app-plus": {
+					"scrollIndicator": "none"
+				}
+			}
+
 		},
 		{
-			"path" : "pages/upload/upload"
-			
+			"path": "pages/upload/upload",
+			"style": {
+				"app-plus": {
+					"scrollIndicator": "none"
+				}
+			}
+
 		},
 		{
-			"path" : "pages/chat/chat"
-			
+			"path": "pages/chat/chat",
+			"style": {
+				"app-plus": {
+					"scrollIndicator": "none"
+				}
+			}
+
 		},
 		{
-			"path" : "pages/mime/mime"
-			
+			"path": "pages/mime/mime",
+			"style": {
+				"app-plus": {
+					"scrollIndicator": "none"
+				}
+			}
 		},
 		{
-			"path" : "pages/loginAndRegister/loginAndRegister",
-			"style" : 
-			{
-				"navigationBarTitleText" : ""
+			"path": "pages/loginAndRegister/loginAndRegister",
+			"style": {
+				"navigationBarTitleText": ""
+			}
+		},
+		{
+			"path": "pages/postDetails/postDetails",
+			"style": {
+				"onReachBottomDistance": 50,
+				"app-plus": {
+					"scrollIndicator": "none",
+					"subNVues": [{
+						"id": "comment_popup", // 唯一标识  
+						"path": "pages/postDetails/subNvue/commentPopup", // 页面路径  
+						"type": "popup",
+						"style": {
+							"position": "absolute",		
+							"bottom": "0",
+							"left": "0",
+							"height": "80%",
+							"width": "100%"
+							
+						}
+					},{
+						"id": "input_popup",
+						"path": "pages/postDetails/subNvue/inputPopup",
+						"type": "popup",
+						"style": {
+							"position": "absolute",
+							"bottom": "0",
+							"height": "50%",
+							"width": "100%"
+						}
+					}]
+				}
+			}
+		},
+		{
+			"path": "pages/userDetail/userDetail",
+			"style": {
+				"app-plus": {
+					"scrollIndicator": "none"
+				}
 			}
 		}
 	],
-	
+
 	"tabBar": {
-		"list": [
-			{
+		"list": [{
 				"pagePath": "pages/index/index",
 				"text": "首页"
 			},
@@ -44,7 +111,7 @@
 				"pagePath": "pages/attention/attention",
 				"text": "关注"
 			},
-			
+
 			{
 				"pagePath": "pages/chat/chat",
 				"text": "聊天"
@@ -63,16 +130,17 @@
 		}
 	},
 	"easycom": {
-	    "autoscan": true,
-	    "custom": {
-	      "^uni-(.*)": "@dcloudio/uni-ui/lib/uni-$1/uni-$1.vue"
-	    }
-	  },
+		"autoscan": true,
+		"custom": {
+			"^uni-(.*)": "@dcloudio/uni-ui/lib/uni-$1/uni-$1.vue"
+		}
+	},
+
 	"globalStyle": {
 		"navigationBarBackgroundColor": "#F8F8F8",
 		"dynamicRpx": true,
 		"backgroundColor": "#37f8f8",
-		"navigationStyle":"custom",
+		"navigationStyle": "custom",
 		"backgroundColorTop": "#007aff",
 		"navigationBarTitleText": "拟合"
 	},
