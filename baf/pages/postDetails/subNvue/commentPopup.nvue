@@ -1,0 +1,877 @@
+<template>
+	<view :style="childCommentContainer">
+		<!-- 控制层 -->
+		<view :style="controlBlock" @click="closeChildCommentblock()">
+			<uni-icons type="closeempty" size="25"></uni-icons>
+		</view>
+		<scroll-view :scroll-y="true" :style="scrollView" lower-threshold="50" @scrolltolower="getChildCommentList">
+			<!-- 父评论 -->
+			<view :style="commentBlock">
+				<view v-if="parentComment !== null && parentComment.userVo.avatar !== null && parentComment.userVo.avatar !== undefined" :style="avatarBlock">
+					<view :style="avatarBorderBlock" @click="skipToUserDetail(parentComment.userVo.id)">
+						<image :src="parentComment.userVo.avatar" :style="imageBlock" />
+					</view>
+				</view>
+				<view :style="userMessageBlock">
+					<view :style="userNameIsLikedBlock">
+						<view :style="userNameIsPosterTimeAddrBlock">
+							<view :style="userNameIsPosterBlock">
+								<view :style="userNameBlock">
+									<text :style="userNameTextBlock">{{parentComment.userVo.userName}}</text>
+								</view>
+								<view :style="isPosterBlock">
+									<image src="/static/poster.png" :style="isPosterImgBlock" />
+								</view>
+							</view>
+							<view :style="timeAddrBlock">
+								<view :style="timeAndAddrBlock">
+									<text :style="timeAddrTextBlock">
+										{{formatTimeAgo(parentComment.publicTime)}}
+									</text>
+								</view>
+								<view :style="timeAndAddrBlock">
+									<text :style="timeAddrTextBlock">
+										· {{parentComment.userVo.province}}
+									</text>
+								</view>
+							</view>
+						</view>
+						<view :style="isLikedBlock">
+							<image v-if="parentComment.isLiked" src="/static/liked.png" :style="isLikedImgBlock"
+								@click.stop="tapLiked()" />
+							<image v-else src="/static/like.png" @click.stop="tapLiked()" :style="isLikedImgBlock" />
+							<view :style="isLikedCountBlock">
+								<text :style="countBlock">{{parentComment.likedCount}}</text>
+							</view>
+						</view>
+					</view>
+					<view :style="contentMediaBlock">
+						<view :style="contentBlock">
+							<text :style="contentFont">
+								{{parentComment.comment}}
+							</text>
+						</view>
+						<video v-if="parentComment.fileType !== null && parentComment.fileType ==='video'"
+							:src="parentComment.fileName" :poster="parentComment.cover"
+							:style="{height:device.rpxToPx(280) + 'px',width:device.rpxToPx(500) + 'px'}" />
+						<view v-else-if="parentComment.fileType !== null && parentComment.fileType === 'image'"
+							:style="mediaBlock">
+							<view v-for="(item,index) in imgList" :style="contentImageBlock">
+								<image :src="item" :style="image" @click="previewImage(index)"></image>
+							</view>
+						</view>
+					</view>
+				</view>
+			</view>
+			<view :style="cuttingLine"></view>
+			<!-- 子评论列表 -->
+			<view :style="commentBlock" v-for="(childComment,index) in childCommentList" :key="childComment.id">
+				<view :style="avatarBlock" v-if="childComment !== null && (childComment.userVo.avatar !== null && childComment.userVo.avatar !== undefined)">
+					<view :style="avatarBorderBlock" @click="skipToUserDetail(childComment.userVo.id)">
+						<image :src="childComment.userVo.avatar" :style="imageBlock" />
+					</view>
+				</view>
+				<view :style="userMessageBlock">
+					<view :style="userNameIsLikedBlock">
+						<view :style="userNameIsPosterTimeAddrBlock">
+							<view :style="userNameIsPosterBlock">
+								<view :style="userNameBlock">
+									<text :style="userNameTextBlock">{{childComment.userVo.userName}}</text>
+								</view>
+								<view :style="isPosterBlock">
+									<image src="/static/poster.png" :style="isPosterImgBlock" />
+								</view>
+							</view>
+							<view :style="timeAddrBlock">
+								<view :style="timeAndAddrBlock">
+									<text :style="timeAddrTextBlock">
+										{{formatTimeAgo(childComment.publicTime)}}
+									</text>
+								</view>
+								<view :style="timeAndAddrBlock">
+									<text :style="timeAddrTextBlock">
+										· {{childComment.userVo.province}}
+									</text>
+								</view>
+							</view>
+						</view>
+						<view :style="isLikedBlock">
+							<image v-if="childComment.isLiked" src="/static/liked.png" :style="isLikedImgBlock"
+								@click.stop="tapLiked()" />
+							<image v-else src="/static/like.png" @click.stop="tapLiked()" :style="isLikedImgBlock" />
+							<view :style="isLikedCountBlock">
+								<text :style="countBlock">{{childComment.likedCount}}</text>
+							</view>
+						</view>
+					</view>
+					<view :style="contentMediaBlock">
+						<view :style="contentBlock">
+							<text :style="contentFont">
+								{{childComment.comment}}
+							</text>
+						</view>
+						<video v-if="childComment.fileType !== null && childComment.fileType ==='video'"
+							:src="childComment.fileName" :poster="childComment.cover"
+							:style="{height:device.rpxToPx(280) + 'px',width:device.rpxToPx(500) + 'px'}" />
+						<view v-else-if="childComment.fileType !== null && childComment.fileType === 'image'"
+							:style="mediaBlock">
+							<view v-for="(item,index) in processChildImageUrls(childComment.fileName)"
+								:style="contentImageBlock">
+								<image :src="item" :style="image" @click="previewImage(index)"></image>
+							</view>
+						</view>
+					</view>
+				</view>
+			</view>
+		</scroll-view>
+		<view :style="mediaFlag === 0 ? inputBlock : inputDisplayBlock">
+			<view v-if="mediaFlag !== 0" :style="imgVideoDisplay">
+				<view v-if="mediaFlag === 1" :style="displayImgBlock">
+					<view v-for="(file,index) in displayedImages" :key="file.id" :style="imgCss(index)" >
+						<image :src="file.fileUrl" @click="previewCommentImage(index)" mode="aspectFill" :style="previewImg"></image>
+						<view v-if="index === 2 && fileList.length > 3" :style="moreTips">
+							<view :style="moreText">+{{fileList.length - 3}}</view>
+						</view>
+					</view>
+				</view>
+				<view v-else-if="mediaFlag === 2" :style="displayVideoBlock">
+					<video :src="fileList[0].fileUrl" :poster="fileList[0].coverUrl" :style="videoElement"></video>
+				</view>
+			</view>
+			<view :style="inputStatusBlock">
+				<view :style="inputSty" @click="openInput">
+					<text :style="fontSty">
+						{{remark.length > 0 ? remark : placeholder}}
+					</text>
+				</view>
+				<view :style="statusSty">
+					<image v-if="remark.trim().length === 0 && fileList.length === 0" src="/static/send.png" :style="imgSty"></image>
+					<image v-else src="/static/sendable.png" :style="imgSty" @click="childComment"></image>
+				</view>
+			</view>
+			
+		</view>
+	</view>
+</template>
+
+<script>
+	import {
+		getDeviceInfo
+	} from '@/utils/device/device.js'
+	import {
+		gainPostComment,comment
+	} from '@/utils/blog/blog.js'
+	import userStore from '@/store/localStore/index.js'
+
+	export default {
+		created() {
+			this.device = getDeviceInfo()
+			uni.$on('openChildComment', (data) => {
+				this.init(data)
+			})
+			uni.$on('resetChildComment',()=>{
+				this.reset()
+			})
+		},
+		
+		
+		onReady() {
+			// 页面准备好后再获取
+			setTimeout(() => {
+				this.inputPopup = uni.getSubNVueById('input_popup')
+				this.inputPopup.setStyle({
+					"height":"60%",
+					
+				})
+			}, 300)
+		}, 
+		computed: {
+			displayedImages() {
+			    return this.fileList.slice(0, 3);
+			},
+			childCommentContainer() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					width: device.windowWidth + 'px',
+					height: device.windowHeight * 0.95 + 'px',
+					backgroundColor: 'white',
+					position:'relative'
+				}
+			},
+			controlBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					height: device.rpxToPx(100) + 'px',
+					width: device.rpxToPx(100) + 'px',
+					display: 'flex',
+					justifyContent: 'center',
+					alignItems: 'center',
+				}
+			},
+			commentBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					display: 'flex',
+					flexDirection: 'row',
+					width: device.percentToPx(100) + 'px',
+					padding: device.rpxToPx(20) + 'px',
+					border: 'solid ' + device.rpxToPx(1) + 'px' + ' #eee'
+				}
+			},
+			scrollView(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					height:device.rpxToPx(1350) + 'px'
+				}
+			},
+			avatarBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					width: device.rpxToPx(100) + 'px',
+
+				}
+			},
+			avatarBorderBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					width: device.rpxToPx(100) + 'px',
+					height: device.rpxToPx(100) + 'px',
+					overflow: 'hidden',
+				}
+			},
+			imageBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					width: device.rpxToPx(100) + 'px',
+					height: device.rpxToPx(100) + 'px',
+					radius: (device.rpxToPx(100) / 2) + 'px',
+					overflow: 'hidden',
+					justifyContent: 'center',
+					alignItems: 'center',
+					borderRadius: (device.rpxToPx(100) / 2) + 'px',
+				}
+			},
+			userMessageBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					flex: '1',
+					padding: device.rpxToPx(0) + ' ' + device.rpxToPx(20) + 'px'
+				}
+			},
+			userNameIsLikedBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					height: device.rpxToPx(100) + 'px',
+					width: device.rpxToPx(580) + 'px',
+					display: 'flex',
+					flexDirection: 'row'
+				}
+
+			},
+			userNameIsPosterTimeAddrBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					width: device.rpxToPx(406) + 'px',
+					height: device.rpxToPx(100) + 'px'
+				}
+			},
+			userNameIsPosterBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					width: device.rpxToPx(406) + 'px',
+					height: device.rpxToPx(50) + 'px',
+					display: 'flex',
+					flexDirection: 'row',
+					marginTop: device.rpxToPx(20) + 'px'
+				}
+			},
+			userNameBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					maxWidth: device.rpxToPx(284) + 'px',
+					height: device.rpxToPx(50) + 'px',
+					lineHeight: device.rpxToPx(50) + 'px',
+					overflow: 'hidden',
+					textOverflow: 'ellipsis',
+					whiteSpace: 'nowrap',
+
+				}
+			},
+			isPosterBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					width: device.rpxToPx(81) + 'px',
+					height: device.rpxToPx(40) + 'px',
+					display: 'flex',
+					alignItems: 'center', // 垂直居中
+					justifyContent: 'center',
+					marginLeft: device.rpxToPx(5) + 'px'
+				}
+			},
+			userNameTextBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					fontSize: device.rpxToPx(28) + 'px',
+					color: '#7e7e7e'
+				}
+			},
+			isPosterImgBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					width: device.rpxToPx(41) + 'px',
+					height: device.rpxToPx(50) + 'px',
+
+				}
+			},
+			timeAddrBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					width: device.rpxToPx(406) + 'px',
+					height: device.rpxToPx(50) + 'px',
+					display: 'flex',
+					flexDirection: 'row',
+				}
+			},
+			timeAndAddrBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					height: device.rpxToPx(50) + 'px',
+					lineHeight: device.rpxToPx(50) + 'px',
+					maxWidth: device.rpxToPx(203) + 'px'
+				}
+			},
+			timeAddrTextBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					fontSize: device.rpxToPx(22) + 'px'
+				}
+			},
+			isLikedBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					width: device.rpxToPx(174) + 'px',
+					height: device.rpxToPx(100) + 'px',
+					display: 'flex',
+					justifyContent: 'center',
+					flexDirection: 'row'
+				}
+			},
+			isLikedImgBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					width: device.rpxToPx(35) + 'px',
+					height: device.rpxToPx(30) + 'px',
+					marginTop: device.rpxToPx(20) + 'px'
+				}
+			},
+			isLikedCountBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					marginTop: device.rpxToPx(15) + 'px',
+					marginLeft: device.rpxToPx(12) + 'px',
+					paddingTop: device.rpxToPx(10) + 'px'
+				}
+			},
+			countBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					fontSize: device.rpxToPx(25) + 'px'
+				}
+			},
+			contentMediaBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					width: device.rpxToPx(570) + 'px',
+
+				}
+			},
+			contentBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					width: device.rpxToPx(570) + 'px',
+					paddingBottom: device.rpxToPx(20) + 'px',
+					paddingTop: device.rpxToPx(20) + 'px',
+					paddingRight: device.rpxToPx(20) + 'px',
+				}
+			},
+			contentFont() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					fontSize: device.rpxToPx(30) + 'px'
+				}
+			},
+			mediaBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					width: device.rpxToPx(580) + 'px',
+					display: 'flex',
+					flexDirection: 'row',
+					flexWrap: 'wrap'
+
+				}
+			},
+			contentImageBlock() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					width: device.rpxToPx(180) + 'px',
+					height: device.rpxToPx(180) + 'px',
+					marginRight: device.rpxToPx(10) + 'px',
+					marginBottom: device.rpxToPx(10) + 'px'
+				}
+			},
+			image() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					width: device.rpxToPx(180) + 'px',
+					height: device.rpxToPx(180) + 'px',
+				}
+			},
+			cuttingLine() {
+				const device = this.device
+				if (!device) return {}
+				return {
+					width: device.percentToPx(100) + 'px',
+					height: device.rpxToPx(10) + 'px',
+					backgroundColor: '#e9e9e9'
+				}
+			},
+			inputBlock() {
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.rpxToPx(750) + 'px',
+					height:device.rpxToPx(100) + 'px',
+					display:'flex',
+					backgroundColor:'white',
+					position:'absolute',
+					left:device.rpxToPx(0) + 'px',
+					bottom:device.rpxToPx(0) + 'px'
+				}
+			},
+			inputDisplayBlock(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.rpxToPx(750) + 'px',
+					height:device.rpxToPx(350) + 'px',
+					display:'flex',
+					position:'absolute',
+					left:device.rpxToPx(0) + 'px',
+					bottom:device.rpxToPx(0) + 'px',
+					backgroundColor:'white'
+					
+				}	
+			},
+			imgVideoDisplay(){
+				const device = this.device
+				if(!device) return{}
+				return{
+					width:device.rpxToPx(750) + 'px',
+					height:device.rpxToPx(250) + 'px',
+					display:'flex',
+					flexDirection:'row',
+					
+				}	
+			},
+			displayImgBlock(){
+				const device = this.device
+				if(!device) return{}
+				return{
+					width:device.rpxToPx(750) + 'px',
+					height:device.rpxToPx(250) + 'px',
+					display:'flex',
+					flexDirection:'row'
+				}
+			},
+			imgCss(index){
+				const device = this.device
+				if(!device) return{}
+				
+				const baseStyle = {
+					height:device.rpxToPx(250) + 'px',
+					width:device.rpxToPx(250) + 'px',
+					paddingLeft:device.rpxToPx(20) + 'px',
+					position:'relative',
+				}	
+				if(index === 2 && this.fileList.length > 3){
+					return{
+						...baseStyle,
+						position:'relative'
+					}
+				}
+				return baseStyle
+			},
+			previewImg(){
+				const device = this.device
+				if(!device) return{}
+				return {
+					height:device.rpxToPx(250) + 'px',
+					width:device.rpxToPx(250) + 'px',
+					position:'absolute'
+				}
+			},
+			moreTips(){
+				const device = this.device
+				if(!device) return{}
+				return{
+					position:'absolute',
+					bottom:device.rpxToPx(10) + 'px',
+					right:device.rpxToPx(10) + 'px',
+					width:device.rpxToPx(50) + 'px',
+					height:device.rpxToPx(50) + 'px',
+					opacity:'0.1'
+				}
+			},
+			moreText(){
+				const device = this.device
+				if(!device) return{}
+				return{
+					fontSize:device.rpxToPx(36)+'px',
+					fontWeight:'blod',
+					color:'white'
+				}
+			},
+			inputStatusBlock(){
+				const device = this.device
+				if(!device) return{}
+				return{
+					width:device.rpxToPx(750) + 'px',
+					height:device.rpxToPx(100) + 'px',
+					display:'flex',
+					flexDirection:'row',
+					paddingTop: device.rpxToPx(20) + 'px',
+					paddingLeft: device.rpxToPx(20) + 'px',
+				}
+			},
+			inputSty(){
+				const device = this.device
+				if(!device) return{}
+				return{
+					width:device.rpxToPx(600) + 'px',
+					height:device.rpxToPx(80) + 'px',
+					paddingTop:device.rpxToPx(20) + 'px',
+					paddingRight:device.rpxToPx(10) + 'px',
+					paddingBottom: device.rpxToPx(12) + 'px',
+					paddingLeft: device.rpxToPx(10) + 'px',
+					backgroundColor:'#e9e9e9'
+				}
+			},
+			fontSty(){
+				const device = this.device
+				if(!device) return{}
+				return{
+					fontSize:device.rpxToPx(30) + 'px',
+					color:'#bcbcbc'
+				}
+			},
+			statusSty(){
+				const device = this.device
+				if(!device) return{}
+				return{
+					width:device.rpxToPx(100) + 'px',
+					height:device.rpxToPx(80) + 'px',
+					marginLeft: device.rpxToPx(10) + 'px',
+					display:'flex',
+					flexDirection:'row',
+					
+				}
+			},
+			imgSty(){
+				const device = this.device
+				if(!device) return{}
+				return{
+					width:device.rpxToPx(80) + 'px',
+					height:device.rpxToPx(80) + 'px'
+				}
+			}
+		},
+		methods: {
+			init(data) {
+				this.parentComment = data.comment
+				this.postId = data.postDetail.id
+				this.childCommentList = []
+					
+				this.getChildCommentList()
+			},
+			imgCss(index){
+				const device = this.device
+				if(!device) return{}
+				
+				const baseStyle = {
+					height:device.rpxToPx(250) + 'px',
+					width:device.rpxToPx(250) + 'px',
+					paddingLeft:device.rpxToPx(20) + 'px',
+					position:'relative',
+				}	
+				if(index === 2 && this.fileList.length > 3){
+					return{
+						...baseStyle,
+						position:'relative'
+					}
+				}
+				return baseStyle
+			},
+			getChildCommentList() {
+				if (!this.flag) {
+					return;
+				}
+				let params = {
+					current: this.current,
+					size: this.size,
+					type: 1, //没有任何排列
+					parentId: this.parentComment.id,
+					postId: this.postId
+				}
+				gainPostComment(params, {}).then(res => {
+					const filterdRes = res.commentList.filter(comment=> !this.newCommentIdList.includes(comment.id))
+					this.childCommentList.push(...filterdRes)
+					this.current = res.current + 1
+					this.pages = res.pages
+					if (this.current > this.pages) {
+						this.flag = false
+					}
+				})
+				this.initImg()
+			},
+			initImg() {
+				if (this.parentComment.fileType !== null && this.parentComment.fileType === 'image') {
+					this.processImageUrls(this.parentComment.fileName)
+				}
+			},
+			closeChildCommentblock() {
+				uni.$emit('closeChildCommentBlock')
+			},
+
+			formatTimeAgo(timeStr) {
+				if (!timeStr) return ''
+
+				const date = new Date(timeStr)
+				const now = new Date()
+				const diffInSeconds = Math.floor((now - date) / 1000)
+				const diffInMinutes = Math.floor(diffInSeconds / 60)
+				const diffInHours = Math.floor(diffInMinutes / 60)
+				const diffInDays = Math.floor(diffInHours / 24)
+
+				// 一分钟内
+				if (diffInSeconds < 60) {
+					return `刚刚`
+				}
+
+				// 一小时内
+				if (diffInMinutes < 60) {
+					return `${diffInMinutes}分钟前`
+				}
+
+				// 一天内
+				if (diffInHours < 24) {
+					return `${diffInHours}小时前`
+				}
+
+				const currentYear = now.getFullYear()
+				const targetYear = date.getFullYear()
+				const month = date.getMonth() + 1
+				const day = date.getDate()
+
+				// 一年内
+				if (currentYear === targetYear) {
+					if (month < 10) {
+						return `${month}-${day.toString().padStart(2, '0')}`
+					} else {
+						return `${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
+					}
+					return `${month}-${day}`
+				}
+
+				// 一年后
+				const year = date.getFullYear()
+				return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
+			},
+			processImageUrls(urls) {
+				if (!urls || typeof urls !== 'string') {
+					this.imgList = [];
+					return;
+				}
+
+				let list = urls.split(',')
+					.map(url => url.trim())
+					.filter(url => url && url !== '');
+
+				this.imgList = list;
+			},
+			processChildImageUrls(urls) {
+				if (!urls || typeof urls !== 'string') {
+					return [];
+				}
+
+				let list = urls.split(',')
+					.map(url => url.trim())
+					.filter(url => url && url !== '');
+
+				return list
+			},
+			previewImage(currentIndex) {
+				if (!this.imgList.length) {
+					return;
+				}
+
+				uni.previewImage({
+					current: currentIndex,
+					urls: this.imgList,
+					indicator: 'number',
+					loop: false
+				});
+			},
+			previewCommentImage(currentIndex) {
+				const urls = this.fileList.map(file => file.fileUrl)
+				uni.previewImage({
+					current: currentIndex,
+					urls: urls,
+					indicator: 'number',
+					loop: false,
+					complete: () => {
+					    // 使用箭头函数，继承外层 this
+					    if (this.$refs.remarkInput) {
+					        this.$refs.remarkInput.focus();
+					    }
+					}
+				});
+			},
+			skipToUserDetail(id) {
+
+				uni.navigateTo({
+					url: "/pages/userDetail/userDetail?id=" + id
+				})
+			},
+			openInput(){
+				uni.$emit('openInput',{
+					postId:this.postId,
+					parentId:this.parentComment.id,
+					fileList:this.fileList,
+					mediaFlag:this.mediaFlag,
+					remark:this.remark
+				})
+				this.inputPopup.show('slide-in-bottom',600,()=>{
+					uni.$on('changeInputVal',(data)=>{
+						this.fileList = [...data.fileList]
+						this.remark = data.remark
+						this.mediaFlag = data.mediaFlag
+						// 强制更新视图
+						this.$forceUpdate()
+						
+					})
+					
+					uni.$on('comment',(data)=>{
+						
+						this.childCommentList.unshift(data)
+						this.newCommentIdList.push(data.id)
+						this.inputPopup.hide()
+						this.$forceUpdate()
+						
+						this.$nextTick(() => {
+						    this.$forceUpdate()
+						    // 滚动到最新评论位置
+						    uni.pageScrollTo({
+						        scrollTop: 0,
+						        duration: 300
+						    })
+						})
+					})
+				})
+			},
+			childComment(){
+				let data = {
+					postId:this.postId,
+					parentId:this.parentComment.id,
+					comment:this.remark,
+					fileType:this.mediaFlag === 0 ? null : this.mediaFlag === 1 ? 'image' : 'video',
+					fileName:this.mediaFlag === 0 ? null : this.mediaFlag === 1 ? this.mergeStr() : this.fileList[0].fileName,
+					cover:this.mediaFlag === 2 ? this.fileList[0].cover : null
+				}
+				comment(data,{}).then(res=>{
+					this.childCommentList.unshift(res)
+					this.newCommentIdList.push(res.id)
+					this.remark = ''
+					this.fileList = []
+					this.mediaFlag = 0
+					this.$forceUpdate()
+					
+					this.$nextTick(() => {
+					    this.$forceUpdate()
+					    // 滚动到最新评论位置
+					    uni.pageScrollTo({
+					        scrollTop: 0,
+					        duration: 300
+					    })
+					})
+				})
+			},
+			mergeStr(){
+				const str = this.fileList.map(item => item.fileName).join(",")
+				return str
+			},
+			reset(){
+				this.postId = null
+				this.current = 1
+				this.size = 5
+				this.pages = 0
+				this.flag = true
+				this.parentComment = {},
+				this.childCommentList = []
+			}
+		},
+
+		data() {
+			return {
+				postId: null,
+				current: 1,
+				size: 5,
+				pages: 0,
+				flag: true,
+				parentComment: {},
+				childCommentList: [],
+				device: null,
+				styles: {},
+				imgList: [],
+				fileList:[],
+				mediaFlag:0,
+				newCommentIdList:[],
+				remark:'',
+				placeholder:'说说看法吧',
+				inputPopup:null
+			}
+		}
+
+	}
+</script>
+
+<style scoped lang="scss">
+
+</style>

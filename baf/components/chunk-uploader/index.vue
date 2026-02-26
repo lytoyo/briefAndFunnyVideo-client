@@ -4,20 +4,21 @@
 		<!-- 文件选择器 -->
 		<file-picker ref="filePicker" :maxImageCount="maxImageCount" :maxVideoCount="maxVideoCount"
 			@select="onFileSelect" @remove="onFileRemove" @change="onFileChange" />
-		<button @click="uploadBlog()">上传博客</button>
-		<button @click="clearMemory()">清除缓存</button>
+		<button @click="uploadFile()">{{$t('chunkUploader.uploadBlog')}}</button>
+		<button @click="clearMer()">清除缓存</button>
 	</view>
+	
 </template>
 
 <script>
 	// 导入spark-md5库
 	import SparkMD5 from 'spark-md5'
 	import FilePicker from '@/components/file-picker/index.vue'
+	import appConfig from '@/config/index.js'
 	import {
 		uploadFileZone
 	} from '@/utils/file/file.js'
 	import http from '@/utils/request.js'
-
 	export default {
 		components: {
 			FilePicker,
@@ -27,17 +28,7 @@
 			// 分片大小（字节）
 			chunkSize: {
 				type: Number,
-				default: 1 * 1024 * 1024 // 1MB
-			},
-			// 最大文件大小（字节），超过此大小使用分片上传
-			maxFileSize: {
-				type: Number,
-				default: 1 * 1024 * 1024 // 1MB
-			},
-			// 是否允许多选
-			multiple: {
-				type: Boolean,
-				default: true
+				default: 5 * 1024 * 1024 // 5MB
 			},
 			//最多多少张图片
 			maxImageCount: {
@@ -49,51 +40,29 @@
 				type: Number,
 				default: 1
 			},
-			// 最大并发数
-			maxConcurrent: {
-				type: Number,
-				default: 3
-			},
-			content: {
-				type: String,
-				default: undefined
-			}
 		},
-
 		data() {
 			return {
 				uploadQueue: [], // 上传队列
-				uploadZoneQueue: [], //上传分片队列
-				uploadStats: {
-					total: 0,
-					success: 0,
-					error: 0,
-					progress: 0
-				},
-				currentUploads: 0, // 当前正在上传的数量
-				fileZoneArr: []
+				currentUploads: 0, // 当前正在上传的总数量
+				currentFinishedUploads: 0 //当前已完成上传的文件数量
 			}
 		},
-
-		computed: {
-			canStartUpload() {
-				return this.uploadQueue.some(item =>
-					item.status === 'waiting' || item.status === 'paused' || item.status === 'error'
-				) && !this.isPaused
-			},
-
-			canPauseAll() {
-				return this.uploadQueue.some(item =>
-					item.status === 'uploading' || item.status === 'md5'
-				) && !this.isPaused
-			}
+		mounted() {
+			this.uploadQueue = [],
+			this.currentUploads = 0;
+			this.currentFinishedUploads = 0;
 		},
-
+		
 		methods: {
+			clearMer(){
+				http.clearToken()
+			},
 			// 文件选择回调
 			onFileSelect(files) {
 				files.files.forEach(file => {
 					this.addToUploadQueue(file)
+					this.currentUploads += 1
 				})
 			},
 			// 从队列移除文件
@@ -101,205 +70,152 @@
 				const index = this.uploadQueue.findIndex(item =>
 					item.file.path === file.file.path
 				)
-
 				if (index !== -1) {
 					this.uploadQueue.splice(index, 1)
+					this.currentUploads -= 1
 				}
 			},
 			//文件类型更改
 			onFileChange() {
-				this.uploadQueue = []
-			},
-			// 生成文件ID
-			generateFileId() {
-				return Date.now() + '-' + Math.random().toString(36).substr(2, 9)
+				this.uploadQueue = [],
+					this.currentUploads = 0;
 			},
 			// 添加到上传队列
 			addToUploadQueue(file) {
-				const fileId = this.generateFileId()
-				var templateName = file.path + file.size + file.type + file.suffix
-				var md5 = SparkMD5.hash(templateName);
 				this.uploadQueue.push({
-					id: fileId, //文件id
 					file: file, //文件
-					status: 'waiting', //状态
-					progress: 0, //上传进度
-					chunkSize: this.chunkSize, //分片大小
-					totalChunks: Math.ceil(file.size / this.chunkSize), //总的分片数量
-					currentChunk: 0, //当前分片下标
-					uploadedChunks: 0, //已经上传的分片
-					md5: md5,
-					chunks: [] // 存储分片信息
 				})
+				this.currentUploads += 1
 			},
-			async uploadBlog() {
-				
-				//将文件进行分片
-				if (this.uploadQueue !== []) {
-					console.log('正在分片')
-					await this.zoneManage()
-					await this.sliceZone()
-					console.log(this.uploadZoneQueue)
-					console.log(this.fileZoneArr)
-				}
-				//用分片信息去切割文件分片
-				
-				//将每个文件都进行上传
-				for (var i = 0; i < this.uploadQueue.length; i++) {
-					var file = this.uploadQueue[i].file;
-					var chunks = this.uploadQueue[i].chunks;
-					//上传每个分片
-					for (var j = 0; j < chunks.length; j++) {
-
-
-					}
-				}
-
-			},
-
-			async sliceZone() {
-				if (this.uploadZoneQueue.length === 0) return;
-				this.fileZoneArr = [];
-				const FileSpliter = uni.requireNativePlugin('Forke-FileSpliter')
-				
-			},
-			//分片处理
-			async zoneManage() {
-
-				// 清空之前的队列
-				this.uploadZoneQueue = []
-				this.currentUploads = 0
-
-				// 为每个文件进行分片处理
-				for (let i = 0; i < this.uploadQueue.length; i++) {
-					const queueItem = this.uploadQueue[i]
-					try {
-						// 清空之前的分片信息
-						queueItem.chunks = []
-
-						// 对文件进行分片处理
-						await this.sliceFile(queueItem)
-
-						// 将分片添加到全局分片队列
-						await this.addChunksToUploadZoneQueue(queueItem)
-
-					} catch (error) {
-						console.error(`文件 ${i + 1} 分片处理失败:`, error)
-					}
-				}
-
-				// 更新总上传数量
-				this.currentUploads = this.uploadZoneQueue.length
-
-			},
-
-			// 对单个文件进行分片处理
-			async sliceFile(queueItem) {
-				return new Promise((resolve) => {
-					const file = queueItem.file
-					const chunkSize = queueItem.chunkSize
-					const totalSize = file.size
-					const totalChunks = Math.ceil(totalSize / chunkSize)
-
-					// 重置分片信息
-					queueItem.totalChunks = totalChunks
-					queueItem.currentChunk = 0
-					queueItem.uploadedChunks = 0
-
-					// 如果文件大小不超过分片大小，则作为一个整体
-					if (totalChunks <= 1) {
-
-						queueItem.chunks.push({
-							index: 0,
-							start: 0,
-							end: totalSize,
-							size: totalSize,
-							uploaded: false,
-							fileId: queueItem.id, // 所属文件ID
-							fileName: this.getFileName(file.path) // 文件名
-						})
-						resolve()
-						return
-					}
-
-
-					// 创建分片信息
-					for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-						const start = chunkIndex * chunkSize
-						const end = Math.min(start + chunkSize, totalSize)
-						const size = end - start
-
-						queueItem.chunks.push({
-							index: chunkIndex,
-							start: start,
-							end: end,
-							size: size,
-							uploaded: false,
-							fileId: queueItem.id, // 所属文件ID
-							fileName: this.getFileName(file.path) // 文件名
-						})
-					}
-					resolve()
+			uploadBlogAndSkip(){
+				uni.showLoading({
+					title:'文件上传中,请勿关闭'
 				})
-			},
-			
+				this.uploadFile()
 				
-			clearMemory(){
-				http.clearToken();
 			},
-
-			// 将单个文件的所有分片添加到全局分片队列
-			async addChunksToUploadZoneQueue(queueItem) {
-				return new Promise((resolve) => {
-					// 为每个分片创建全局分片任务
-					queueItem.chunks.forEach((chunk, chunkIndex) => {
-						const globalChunkId = this.generateFileId() // 生成全局唯一的chunk ID
-
-						const uploadTask = {
-							// 分片基本信息
-							id: globalChunkId, // 全局分片ID
-							fileId: queueItem.id, // 所属文件ID
-							chunkIndex: chunk.index, // 在文件中的分片索引
-							fileName: chunk.fileName, // 文件名
-
-							// 分片文件信息
-							chunk: {
-								...chunk,
-								chunkId: globalChunkId // 将全局ID也存入chunk中
-							},
-							// 文件信息
-							file: {
-								...queueItem.file,
-								fileId: queueItem.id
-							},
-							// 文件元信息
-							fileInfo: {
-								id: queueItem.id,
-								md5: queueItem.md5,
-								chunkSize: queueItem.chunkSize,
-								totalChunks: queueItem.totalChunks
-							},
-
-							// 上传状态
-							status: 'waiting', // waiting, uploading, success, error
-							progress: 0,
-							retryCount: 0,
-
-							// 上传信息
-							startTime: null,
-							endTime: null,
-							error: null
+			//上传博客
+			async uploadFile() {
+				if (this.uploadQueue.length > 0) {
+					var filesInfo = []
+					const FileSpliter = uni.requireNativePlugin("Forke-FileSpliter");
+					for (var i = 0; i < this.uploadQueue.length; i++) {
+						const fileInfo = this.uploadQueue[i].file;
+						var md5 = Number(Math.random().toString().substr(5, 10) + Date.now()).toString(36)
+						var fileName = md5 + fileInfo.suffix
+						this.uploadQueue[i] = {
+							...this.uploadQueue[i],
+							fileName:fileName
 						}
-
-						// 添加到全局分片队列
-						this.uploadZoneQueue.push(uploadTask)
-
-					})
-
-					resolve()
+						//文件大小小于1M，直接上传
+						if (fileInfo.size < this.chunkSize) {
+							var fileMsg = {
+								"md5": md5,
+								"suffix": fileInfo.suffix,
+								"size": fileInfo.size,
+								"type": fileInfo.type,
+							}
+							if (fileInfo.type === 'video') {
+								fileMsg = {
+									...fileMsg,
+									"width": fileInfo.width,
+									"height": fileInfo.height,
+									"duration": fileInfo.duration,
+								}
+							}
+							//直接上传
+							uni.uploadFile({
+								url: appConfig.BASE_URL+'server/file/smallFileUpload',
+								filePath: fileInfo.path,
+								name: 'file',
+								header: {
+									"Authorization": http.authConfig
+										.tokenPrefix + http.getToken()
+								},
+								formData: {
+									...fileMsg
+								},
+								success(res) {
+									this.currentFinishedUploads += 1
+								}
+							})
+							//上传进度+1
+						} 
+						//文件大小大于1M，分片上传
+						else {
+							let formdata = {
+								"hashCode": md5,
+								"suffix": fileInfo.suffix, //文件后缀
+								'size': fileInfo.size, //文件大小
+								'chunkSize': this.chunkSize, //分片大小 1m
+								'chunkCount': Math.ceil(fileInfo.size / this.chunkSize), //分片次数  
+							}
+							plus.io.resolveLocalFileSystemURL(fileInfo.path, (entry) => {
+								entry.file((file) => {
+									FileSpliter.splitFile({
+										filePath: file.fullPath,
+										savePath: plus.io.convertLocalFileSystemURL("_doc/FileSpliter"),
+										fileName: file.name,
+										chunkSize: this.chunkSize
+									}, (ret) => {
+										if (ret) {
+											if (ret.code == 'process') {
+												uni.uploadFile({
+													url: 'http://10.99.21.126:8884/server/file/uploadZone',
+													filePath: ret.path, //切片返回的路径
+													name: 'file',
+													header: {
+														"Authorization": http.authConfig.tokenPrefix + http.getToken()
+													},
+													formData: {
+														"md5": formdata.hashCode,
+														'chunkIndex': ret.chunk, //分片序号
+													}
+												})
+											} else if (ret.code == 'complete') {
+												this.currentFinishedUploads += 1
+												this.deleteFiles(file.name)
+											} else if (ret.code == 'start') {
+											}
+										}
+									})
+								}, (ret) => {
+									//失败回调
+								})
+							})
+							var fileMsg = {
+								"md5": formdata.hashCode,
+								"suffix": formdata.suffix,
+								"size": formdata.size,
+								"type": fileInfo.type,
+								"chunkCount": formdata.chunkCount
+							}
+							if (fileInfo.type === 'video') {
+								fileMsg = {
+									...fileMsg,
+									"width": fileInfo.width,
+									"height": fileInfo.height,
+									"duration": fileInfo.duration,
+								}
+							}
+							filesInfo.push(fileMsg)
+						}
+					}
+				}	
+				//告知父组件文件全部上传完毕，并返回需要进行分片合并的文件信息
+				this.$emit("uploadFileComplate", {
+					filesInfo: filesInfo,
+					uploadQueue: this.uploadQueue
 				})
+				uni.hideLoading()
 			},
-
+			deleteFiles(fileName) {
+				const FileSpliter = uni.requireNativePlugin('Forke-FileSpliter');
+				FileSpliter.clearFilePath({
+					savePath: plus.io.convertLocalFileSystemURL("_doc/FileSpliter"),
+					fileName: fileName
+				}, (ret) => {}, (ret) => {});
+			},
 			// 格式化文件大小
 			formatFileSize(bytes) {
 				if (bytes === 0 || !bytes) return '0 B'
@@ -308,16 +224,6 @@
 				const i = Math.floor(Math.log(bytes) / Math.log(k))
 				return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 			},
-
-			// 获取文件名
-			getFileName(path) {
-				if (!path) return '未命名文件'
-				if (typeof path !== 'string') return '未命名文件'
-
-				const parts = path.split('/')
-				return parts[parts.length - 1] || '未命名文件'
-			},
-
 		}
 	}
 </script>

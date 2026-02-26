@@ -6,7 +6,7 @@
 		<uni-easyinput :value="content" :trim="true" type="textarea" :inputBorder="false" 
 		style="width:100%; white-space:normal;margin: auto;"
 		:clearable="false"  :placeholder="$t('upload.sayAny')" />
-		<chunk-uploader ref="chunkUploader" :upload-url="uploadUrl" :content="content"/>
+		<chunk-uploader ref="chunkUploader" :upload-url="uploadUrl" :content="content" @uploadFileComplate="onUploadFileComplate"/>
 	</view>
 </template>
 
@@ -14,6 +14,8 @@
 	import FilePicker from '@/components/file-picker/index.vue'
 	import ChunkUploader from '@/components/chunk-uploader/index.vue'
 	import GlobalStatusBar from '../../components/global-status-bar/global-status-bar.vue'
+	import {zoneMerge} from "@/utils/file/file.js"
+	import {uploadBlog} from "@/utils/blog/blog.js"
 	export default {
 		name: 'SimpleUploader',
 		components: {
@@ -55,7 +57,46 @@
 		},
 
 		methods: {
-
+			async onUploadFileComplate(files){	
+				var filesInfo = files.filesInfo
+				var uploadQueue = files.uploadQueue
+				if(filesInfo.length > 0){
+					//需要发送分片合并请求
+					for(var i = 0; i < filesInfo.length;i++){
+						var fileInfo = filesInfo[i]
+						await zoneMerge(fileInfo,{})
+					}
+				}
+				var fileName = ""
+				for(var j = 0; j < uploadQueue.length; j++){
+					fileName = uploadQueue.map(item => item.fileName).join(',');
+				}
+				//分片合并结束后需要将博客整体一起上传
+				var blog = {
+					content: this.content,
+					fileName: fileName === "" ? null : fileName,
+					fileType: uploadQueue.length > 0 ? uploadQueue[0].file.type : null
+				}
+				uni.showLoading({
+					title:'博客上传中，请勿关闭'
+				})
+				const res = uploadBlog(blog,{})
+				uni.hideLoading()
+				if(res.code === 200){
+					uni.showToast({
+						title:'博客上传完毕，待审核',
+						icon:'none'
+					})	
+				}else{
+					uni.showToast({
+						title:'博客上传失败，请重试',
+						icon:'none'
+					})
+				}
+				uni.switchTab({
+					url:'/pages/index/index'
+				})
+			}
 		}	
 	}
 </script>

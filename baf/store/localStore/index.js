@@ -1,4 +1,4 @@
-import http from "../../utils/request";
+import http from "@/utils/request.js";
 
 export default {
 	
@@ -24,14 +24,9 @@ export default {
 	
 	//获取用户信息
 	getUserInfo(){
-		var userInfo = undefined;
-		uni.getStorage({
-			key:'userInfo',
-			success(res) {
-				userInfo = res.data
-			}
-		})
-		return userInfo
+		const userInfo = uni.getStorageSync("userInfo")
+		return userInfo?userInfo:undefined
+		
 	},
 	
 	//用户退出登录

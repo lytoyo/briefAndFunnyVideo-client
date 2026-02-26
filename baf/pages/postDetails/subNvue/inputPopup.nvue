@@ -1,0 +1,421 @@
+<template>
+	<view :style="inputContainer">
+		<view :style="inputSendDisplayBlock">
+			<view :style="displayBlock">
+				
+				<view  v-if="mediaFlag === 1" :style="imageDisplay">
+					<scroll-view :scroll-x="true" :show-scrollbar="false" :style="scrollSty">
+						<view v-for="(file,index) in fileList" :key="file.id" :style="imgVessel" >
+							<image :style="imgSty" :src="file.fileUrl" @click="previewImage(index)" mode="aspectFill">
+								<image src="/static/close.png" :style="iconLocation" @click.stop="delImg(index)"></image>
+							</image>
+						</view>
+					</scroll-view>
+				</view>
+				<view  v-else-if="mediaFlag === 2" :style="videoDisplay">
+					<video :src="fileList[0].fileUrl" :poster="fileList[0].coverUrl" :style="videoElement">
+						<cover-image src="/static/close.png" :style="iconLocation" @click.stop="delVideo"></cover-image>
+					</video>
+				</view>
+			</view>
+			<view :style="inputSendStatusBlock">
+				<view :style="inputSendBlock">
+					<view :style="inputBlock">
+						<input v-model="remark" ref="remarkInput" :focus="isFocused"
+						 @keyboardheightchange="boardHeightChange"/>
+					</view>
+				</view>
+				<view :style="sendStatusBlock">
+					<view :style="statusBlock">
+						<image v-if="fileList.length === 0 && (remark === null || remark === '')" src="/static/send.png" :style="imageStyle"></image>
+						<image v-else src="/static/sendable.png" :style="imageStyle" @click="postComment"></image>
+					</view>
+					<view :style="statusBlock">
+						<image src="/static/picture.png" :style="imageStyle" @click="chooseImage"></image>
+					</view>
+					<view :style="statusBlock">
+						<image src="/static/video.png" :style="imageStyle" @click="chooseVideo"></image>
+					</view>
+				</view>
+			</view>
+		</view>
+	</view>
+</template>
+
+<script>
+	import { getDeviceInfo } from '@/utils/device/device.js'
+	import { uploadCommentFile } from '@/utils/file/file.js'
+	import {comment} from '@/utils/blog/blog.js'
+	export default {
+		created(){  
+			this.device = getDeviceInfo()
+			uni.$on('openInput',(data)=>{
+				this.init(data)
+				setTimeout(() => {
+					this.isFocused = true;
+					this.$nextTick(() => {
+						if (this.$refs.remarkInput) {
+							this.$refs.remarkInput.focus();
+						}
+					});
+				}, 300);
+			})
+		},
+		watch:{
+			remark:function(newVal,oldVal){
+				uni.$emit('changeInputVal',{
+					remark:newVal,
+					fileList:this.fileList,
+					mediaFlag:this.mediaFlag
+				})
+			},
+			fileList:function(newVal,oldVal){
+				if(newVal.size === 0){
+					this.mediaFlag = 0
+				}
+				uni.$emit('changeInputVal',{
+					remark:this.remark,
+					fileList:newVal,
+					mediaFlag:this.mediaFlag
+				})
+			},
+			mediaFlag:{
+				handler: function(newVal, oldVal) {
+					// 发送数据更新
+					uni.$emit('changeInputVal', {
+						remark: this.remark,
+						fileList: this.fileList,
+						mediaFlag: newVal
+					})
+				},
+			},
+		},
+		computed:{
+			inputContainer(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					widht:device.windowWidth + 'px',
+					backgroundColor:'white'
+				}
+			},
+			inputSendDisplayBlock(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.percentToPx(100) + 'px',
+					height:device.rpxToPx(380) + 'px',
+					
+				}
+			},
+			displayBlock(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.rpxToPx(750) + 'px',
+					height:device.rpxToPx(250) + 'px',
+				}
+			},
+			fileDisplayBlock(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.rpxToPx(750) + 'px',
+					height:device.rpxToPx(250) + 'px',
+				}
+			},
+			videoDisplay(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.rpxToPx(750) + 'px',
+					height:device.rpxToPx(250) + 'px',
+					paddingLeft:device.rpxToPx(20) + 'px',
+					paddingTop:device.rpxToPx(20) + 'px',
+					
+				}
+			},
+			imageDisplay(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.rpxToPx(750) + 'px',
+					height:device.rpxToPx(250) + 'px',
+				}
+			},
+			scrollSty(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.rpxToPx(750) + 'px',
+					height:device.rpxToPx(250) + 'px',
+					display:'flex',
+					flexDirection:'row',
+					whiteSpace: 'nowrap',
+				}	
+			},
+			imgVessel(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.rpxToPx(250) + 'px',
+					height:device.rpxToPx(250) + 'px',
+					paddingLeft:device.rpxToPx(20) + 'px',
+					paddingTop:device.rpxToPx(20) + 'px',
+					paddingRight:device.rpxToPx(20) + 'px',
+					paddingBottom:device.rpxToPx(20) + 'px',
+					display: 'inline-block',
+					      verticalAlign: 'top'
+				}	
+			},
+			imgSty(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.rpxToPx(200) + 'px',
+					height:device.rpxToPx(200) + 'px',
+				}
+			},
+			videoElement(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.rpxToPx(375) + 'px',
+					height:device.rpxToPx(200) + 'px',
+					
+				}
+			},
+			iconLocation(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.rpxToPx(50) + 'px',
+					height:device.rpxToPx(50) + 'px',
+					position:'absolute',
+					top:'10',
+					right:'15'
+				}
+			},
+			inputSendStatusBlock(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.rpxToPx(750) + 'px',
+					height:device.rpxToPx(80) + 'px',
+					display:'flex',
+					flexDirection:'row',
+					marginTop:device.rpxToPx(25) + 'px',
+					marginBottom:device.rpxToPx(20) + 'px'
+				}
+			},
+			inputSendBlock(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.rpxToPx(500) + 'px',
+					height:device.rpxToPx(80) + 'px',
+					display:'flex',
+					flexDirection:'row',
+					justifyContent: 'center',
+				}
+			},
+			inputBlock(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.rpxToPx(450) + 'px',
+					height:device.rpxToPx(80) + 'px',
+					backgroundColor:'#d9d9d9',
+					borderRadius: device.rpxToPx(30) + 'px',
+					padding:device.rpxToPx(15) + 'px',
+				}
+			},
+			sendStatusBlock(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.rpxToPx(250) + 'px',
+					height:device.rpxToPx(80) + 'px',
+					display:'flex',
+					flexDirection:'row',
+					justifyContent:'space-around'
+				}
+			},
+			statusBlock(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.rpxToPx(80) + 'px',
+					height:device.rpxToPx(80) + 'px',
+					lineHeight:device.rpxToPx(80) + 'px'
+				}
+			},
+			imageStyle(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.rpxToPx(60) + 'px',
+					height:device.rpxToPx(60) + 'px',
+				}
+			}
+		},
+		methods:{
+			init(data){
+				this.remark = data.remark
+				this.parentId = data.parentId
+				this.mediaFlag = data.mediaFlag
+				this.fileList = data.fileList
+				this.postId = data.postId
+				
+			},
+			
+			chooseVideo(){
+				uni.chooseVideo({
+					success: (res) => {
+					    
+						if(res.size > 1024 * 1024 * 15){
+							uni.showToast({
+								title:'视频文件选择不可超过15M',
+								icon:'none'
+							})
+							return
+						}
+						uploadCommentFile(res.tempFilePath,{
+								suffix:'.'+res.tempFilePath.split('.').pop(),
+								size: res.size,
+								type: 'video',
+								width: res.width,
+								height: res.height,
+								duration: res.duration,
+							},{}).then(fileRes=>{
+								this.mediaFlag = 2
+								this.fileList = []
+								this.fileList.push(fileRes)
+								console.log(fileRes)
+							})
+					},
+					complete: () => {
+					    // 使用箭头函数，继承外层 this
+					    if (this.$refs.remarkInput) {
+					        this.$refs.remarkInput.focus();
+					    }
+					}
+				})
+			},
+			postComment(){
+				let data = {
+					postId:this.postId,
+					parentId:this.parentId,
+					comment:this.remark,
+					fileType:this.mediaFlag === 0 ? null : this.mediaFlag === 1 ? 'image' : 'video',
+					fileName:this.mediaFlag === 0 ? null : this.mediaFlag === 1 ? this.mergeStr() : this.fileList[0].fileName,
+					cover:this.mediaFlag === 2 ? this.fileList[0].cover : null
+				}
+				comment(data,{}).then(res=>{
+					
+					this.remark = ''
+					this.fileList = []
+					this.mediaFlag = 0
+					uni.$emit('comment',res)
+				})
+			},
+			mergeStr(){
+				const str = this.fileList.map(item => item.fileName).join(",")
+				return str
+			},
+			chooseImage(){
+				uni.chooseImage({
+					count:9-this.fileList.length,
+					success: async (res) => {
+				        var tempFiles = res.tempFiles;
+				        
+				        // 重置文件列表，确保从干净状态开始
+				        if(this.mediaFlag !== 1){
+				            this.fileList = []
+				            
+				        }
+				        
+				        // 创建一个临时数组存储上传结果
+				        const uploadedFiles = []
+				        for(var i = 0; i < tempFiles.length; i++){
+				            try {
+				                const fileRes = await uploadCommentFile(tempFiles[i].path, {
+				                    suffix: '.' + tempFiles[i].path.split('.').pop(),
+				                    size: tempFiles[i].size,
+				                    type: 'image'
+				                }, {})
+				                
+				                uploadedFiles.push(fileRes)
+				            } catch (error) {
+				                console.error('图片上传失败:', error)
+				            }
+				        }
+				        
+				        // 一次性更新 fileList
+				        this.fileList = [...this.fileList, ...uploadedFiles]
+						this.mediaFlag = 1
+						console.log(this.fileList)
+				    },
+					
+					complete: () => {
+					    // 使用箭头函数，继承外层 this
+					    if (this.$refs.remarkInput) {
+					        this.$refs.remarkInput.focus();
+					    }
+					}
+				})
+			},
+			delVideo(){
+				this.fileList = []
+				this.mediaFlag = 0
+			},
+			delImg(index){
+				 // 使用 $set 确保响应式更新
+				this.$delete(this.fileList, index)
+				
+				// 或者使用 splice
+				// this.fileList.splice(index, 1)
+				
+				console.log('删除后 fileList:', this.fileList)
+				
+				// 如果数组为空，重置 mediaFlag
+				if(this.fileList.length === 0){
+					this.mediaFlag = 0
+				}
+				
+				// 强制更新视图
+				this.$forceUpdate()
+			},
+			previewImage(currentIndex) {
+				const urls = this.fileList.map(file => file.fileUrl)
+				uni.previewImage({
+					current: currentIndex,
+					urls: urls,
+					indicator: 'number',
+					loop: false,
+					complete: () => {
+					    // 使用箭头函数，继承外层 this
+					    if (this.$refs.remarkInput) {
+					        this.$refs.remarkInput.focus();
+					    }
+					}
+				});
+			},
+		},
+		data(){
+			return{
+				remark:null,
+				mediaFlag:0,
+				parentId:0,
+				fileList:[],
+				device:null,
+				postId:null,
+				isFocused:true
+			}
+		}
+	}
+</script>
+
+<style>
+
+</style>

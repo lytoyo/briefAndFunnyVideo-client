@@ -1,0 +1,39 @@
+{
+    "name": "Forke-FileSpliter",
+    "id": "Forke-FileSpliter",
+    "version": "1.0.1",
+    "description": "大文件分片，适用于大文件分片上传",
+    "_dp_type":"nativeplugin",
+    "_dp_nativeplugin":{
+        "android": {
+            "plugins": [
+                {
+                    "type": "module",
+                    "name": "Forke-FileSpliter",
+                    "class": "io.forke.uniplugin.FileSpliter"
+                }
+            ],
+            "hooksClass": "",
+            "integrateType": "aar",
+            "dependencies": [
+                "com.alibaba:fastjson:1.1.46.android"
+            ],
+            "compileOptions": {  
+                "sourceCompatibility": "1.8",
+                "targetCompatibility": "1.8"
+            },
+            "abis": [
+               
+            ],
+            "minSdkVersion": "21",
+            "useAndroidX": false,   
+            "permissions": [
+                "android.permission.WRITE_EXTERNAL_STORAGE",
+                "android.permission.READ_EXTERNAL_STORAGE"
+            ],
+            "parameters": {
+               
+            }
+        }
+    }
+}

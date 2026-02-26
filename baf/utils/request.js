@@ -1,9 +1,10 @@
 import appConfig from '@/config/index.js'
+import userStore from '@/store/localStore/index.js'
 
 class HttpRequest {
     constructor() {
         this.baseURL = appConfig.BASE_URL
-        this.timeout = 5000
+        this.timeout = 30000
         this.requestQueue = new Map()
         
         //  认证配置 - 修复了字段名
@@ -80,16 +81,20 @@ class HttpRequest {
             'Authorization': 'Basic c2FiZXI6c2FiZXJfc2VjcmV0', // 基础认证
             ...params.header
         }
-        
+		
+        if(this.getToken()){
+			const authHeader = this.buildAuthHeader()
+			if (authHeader) {
+			    baseHeader[this.authConfig.tokenField] = authHeader
+			}  
+		}
         //  动态添加认证头
         if (this.shouldAddAuthHeader(params)) {
-			
             const authHeader = this.buildAuthHeader()
             if (authHeader) {
                 baseHeader[this.authConfig.tokenField] = authHeader
             }
         }
-		
         return {
             url: this.baseURL + params.url,
             method: params.method || 'GET',
@@ -101,11 +106,6 @@ class HttpRequest {
     
     //  判断是否需要添加认证头
     shouldAddAuthHeader(params) {
-        // // 如果显式设置不需要认证
-        // if (params.noAuth === true) return false
-        
-        // // 如果认证功能未启用
-        // if (!this.authConfig.enabled) return false
 		
         // 公开接口不需要认证
         if (this.isPublicApi(params.url)){
@@ -118,8 +118,13 @@ class HttpRequest {
     buildAuthHeader() {
         const token = this.getToken()
         if (!token) {
-            console.warn('认证已启用，但未找到token')
-            return ''
+            uni.showToast({
+            	title:'该操作需要登录',
+				icon:'none'
+            }),
+			uni.navigateTo({
+				url:'/pages/loginAndRegister/loginAndRegister'
+			})
         }
         return this.authConfig.tokenPrefix + token
     }
@@ -129,7 +134,17 @@ class HttpRequest {
         const publicApis = [
 			'server/system/code',
             'server/system/login',
-            'server/system/register'
+            'server/system/register',
+			'server/search/complement',
+			'server/search/comprehensiveSearch',
+			'server/search/postQueries',
+			'server/search/categoryQueries',
+			'server/search/userQueries',
+			'server/file/zoneRequest',
+			'server/blog/postList',
+			'server/blog/gainPostDetail',
+			'server/blog/gainPostComment',
+			 'server/user/collectPostList'
         ]
 		
         return publicApis.some(api => url.startsWith(api))
@@ -179,13 +194,12 @@ class HttpRequest {
                 'Authorization': 'Basic c2FiZXI6c2FiZXJfc2VjcmV0',
                 ...config.header
             }
-            //  动态添加认证头
-            if (this.shouldAddAuthHeader(config)) {
-                const authHeader = this.buildAuthHeader()
-                if (authHeader) {
-                    headers[this.authConfig.tokenField] = authHeader
-                }
+            const authHeader = this.buildAuthHeader()
+            
+            if (authHeader) {
+                headers[this.authConfig.tokenField] = authHeader
             }
+			
             uni.uploadFile({
                 url: this.baseURL + url,
                 filePath,
@@ -208,35 +222,6 @@ class HttpRequest {
         })
     }
 
-    //  文件下载 - 支持认证
-    download(url, config = {}) {
-        return new Promise((resolve, reject) => {
-            const headers = {
-                'Authorization': 'Basic c2FiZXI6c2FiZXJfc2VjcmV0',
-                ...config.header
-            }
-            //  动态添加认证头
-            if (this.shouldAddAuthHeader(config)) {
-                const authHeader = this.buildAuthHeader()
-                if (authHeader) {
-                    headers[this.authConfig.tokenField] = authHeader
-                }
-            }
-            uni.downloadFile({
-                url: this.baseURL + url,
-                header: headers,
-                success: (res) => {
-                    if (res.statusCode === 200) {
-                        resolve(res.tempFilePath)
-                    } else {
-                        this.handleHttpError(res.statusCode)
-                        reject(new Error(`下载失败: ${res.statusCode}`))
-                    }
-                },
-                fail: reject
-            })
-        })
-    }
     
     //  处理业务响应
     handleBusinessResponse(responseData, resolve, reject) {
@@ -258,13 +243,22 @@ class HttpRequest {
         let message = msg || '操作失败'
         
         switch (code) {
+			case 400:
+				message = '输入数据有误，请重新输入'
+				break
             case 401:
                 message = '登录已过期，请重新登录'
                 this.handleUnauthorized()
                 break
+			case 404:
+				message = '未找到该资源，请稍后重试'
+				break
             case 500:
-                message = '系统繁忙，请稍后重试'
+                message = '服务奔溃，请稍后重试'
                 break
+			case 503:
+				message = '服务器繁忙，请稍后重试'
+				break
             default:
                 message = msg || `操作失败: ${code}`
         }
@@ -279,6 +273,7 @@ class HttpRequest {
     //  未授权处理
     handleUnauthorized() {
         this.clearToken() // 清除token
+		userStore.clearUserInfo();
         setTimeout(() => {
             uni.reLaunch({
                 url: '/pages/loginAndRegister/loginAndRegister'

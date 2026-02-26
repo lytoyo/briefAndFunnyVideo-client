@@ -30,5 +30,7 @@ export default {
 
 <style scoped>
 .global-status-bar {
+	flex-shrink: 0;
+	background-color: white;
 }
 </style>
