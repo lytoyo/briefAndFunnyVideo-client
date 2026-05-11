@@ -3,13 +3,11 @@
 		<global-status-bar />
 		<view class="header" v-if="noLogin">
 			<view class="head-left">
-				<image :src="user.avatar" mode="aspectFit"></image>
+				<image :src="user.avatar === null || user.avatar === undefined ? '/static/unLogin.png' : user.avatar" mode="aspectFit"></image>
 			</view>
 			<view class="head-right">
-				<text class="slogan-one">{{$t('mime.sloganOne')}}</text>
-				<text class="slogan-two">{{$t('mime.sloganTwo')}}</text>
 				<view>
-					<my-button type="primary" :round="true"
+					<my-button type="primary" :round="true" style="width: 200rpx;height: 70rpx;"
 						@click="goToLoginAndRegister()">{{$t('mime.unLogin')}}</my-button>
 				</view>
 			</view>
@@ -20,7 +18,7 @@
 			</view>
 			<uni-row class="head-profile">
 				<view class="image-content">
-					<image :src="user.avatar"></image>
+					<image :src="user.avatar === null || user.avatar === undefined ? '/static/unLogin.png' : user.avatar"></image>
 				</view>
 			</uni-row>
 			<uni-row class="head-userName">
@@ -51,9 +49,9 @@
 				in-active-color="#000" @clickItem="onClickItem" />
 		</view>
 		<view class="bottom">
-			<uni-grid v-if="current === 0 && postList.length > 0" :column="3" :highlight="true" @change="skipDetail">
+			<uni-grid v-if="current === 0 && postList.length > 0" :column="3" :highlight="true" >
 				<uni-grid-item v-for="(item, index) in postList" :index="index" :key="index">
-					<view class="grid-item-box">
+					<view class="grid-item-box" @click="skipDetail(item.id)">
 						<!-- 图片容器，使用相对定位 -->
 						<view class="image-container">
 							<image :src="item.cover" mode="aspectFill" class="post-image" />
@@ -72,9 +70,9 @@
 				<view>{{$t('mime.noPostContent')}}</view>
 				<view>{{$t('mime.postDisplay')}}</view>
 			</view>
-			<uni-grid v-if="current === 1 && likedList.length > 0" :column="3" :highlight="true" @change="skipDetail">
+			<uni-grid v-if="current === 1 && likedList.length > 0" :column="3" :highlight="true" >
 				<uni-grid-item v-for="(item, index) in likedList" :index="index" :key="index">
-					<view class="grid-item-box">
+					<view class="grid-item-box" @click="skipDetail(item.id)">
 						<!-- 图片容器，使用相对定位 -->
 						<view class="image-container">
 							<image :src="item.cover" mode="aspectFill" class="post-image" />
@@ -91,9 +89,9 @@
 				<view>{{$t('mime.noLikedContent')}}</view>
 				<view>{{$t('mime.likedDisplay')}}</view>
 			</view>
-			<uni-grid v-if="current === 2 && collectList.length > 0" :column="3" :highlight="true" @change="skipDetail">
+			<uni-grid v-if="current === 2 && collectList.length > 0" :column="3" :highlight="true" >
 				<uni-grid-item v-for="(item, index) in collectList" :index="index" :key="index">
-					<view class="grid-item-box">
+					<view class="grid-item-box" @click="skipDetail(item.id)">
 						<!-- 图片容器，使用相对定位 -->
 						<view class="image-container">
 							<image :src="item.cover" mode="aspectFill" class="post-image" />
@@ -111,8 +109,6 @@
 				<view>{{$t('mime.collectDisplay')}}</view>
 			</view>
 		</view>
-
-		<!-- <button @click="clearMemory()">清除缓存</button> -->
 	</view>
 </template>
 
@@ -180,7 +176,10 @@
 					contentdown: this.$t('mime.contentdown'),
 					contentrefresh: this.$t('mime.contentrefresh'),
 					contentnomore: this.$t('mime.contentnomore'),
-				}
+				},
+				isGoToLoginAndRegister:false,
+				isGoToSettings:false,
+				isSkipDetail:false
 			}
 		},
 		onReachBottom() {
@@ -191,8 +190,15 @@
 				return intro === null ? '这个人很懒，什么都没介绍' : intro
 			},
 			goToLoginAndRegister() {
+				if(this.isGoToLoginAndRegister) return
+				this.isGoToLoginAndRegister = true
 				uni.navigateTo({
-					url: "/pages/loginAndRegister/loginAndRegister"
+					url: "/pages/loginAndRegister/loginAndRegister",
+					complete: () => {
+						setTimeout(()=>{
+							this.isGoToLoginAndRegister = false
+						})
+					}
 				})
 			},
 			clearMemory() {
@@ -208,17 +214,14 @@
 
 			},
 			skipDetail(e) {
-				let {
-					index
-				} = e.detail
-				//点击贴子跳转到贴子详情
-				if (this.current === 0) {
-					
-				} else if (this.current === 1) {
-
-				} else {
-
-				}
+				if(this.isSkipDetail) return
+				this.isSkipDetail = true
+				uni.navigateTo({
+					url:'/pages/postDetails/postDetails?postId='+ e,
+					complete: () => {
+						this.isSkipDetail = false
+					}
+				})
 
 			},
 			clickLoadMore(e) {
@@ -282,19 +285,48 @@
 				}
 			},
 			goToSettings(){
+				if(this.isGoToSettings) return
+				this.isGoToSettings = true
 				//点击进入设置界面
+				var id = userStore.getUserid()
+				uni.navigateTo({
+					url:'/pages/set/set?userId='+id,
+					complete: () => {
+						setTimeout(()=>{
+							this.isGoToSettings = false
+						},800)
+					}
+				})
 			}
 		},
-
-		mounted() {
+		onShow() {
 			this.postCurrent = 1;
 			this.likedCurrent = 1;
 			this.collectCurrent = 1;
+			this.current = 0;
+			if (http.hadLogin()) {
+				this.user = userStore.getUserInfo()
+				
+				this.noLogin = false
+				var params = {
+					userId: this.user.id
+				}
+				userStatus(params, {}).then(res => {
+					
+					this.status = {
+						...res
+					}
+				})
+
+			} else {
+				this.noLogin = true
+				this.user.avatar = '/static/unLogin.png'
+			}
 			if (http.hadLogin()) {
 				this.user = userStore.getUserInfo()
 				this.noLogin = false
 				//获取用户本人发表的帖子
-
+			
 				var params = {
 					userId: this.user.id,
 					current: this.postCurrent,
@@ -305,37 +337,21 @@
 					this.postCurrent = res.blogCurrent + 1
 					this.postPages = res.blogPages
 					this.postTotal = res.blogTotal
-
+			
 					this.likedList = res.likedList
 					this.likedPages = res.likedPages
 					this.likedTotal = res.likedTotal
 					this.likedCurrent = res.likedCurrent + 1
-
+			
 					this.collectList = res.collectList
 					this.collectCurrent = res.collectCurrent + 1
 					this.collectPages = res.collectPages
 					this.collectTotal = res.collectTotal
 				})
-			}
-		},
-		onShow() {
-			this.current = 0;
-			if (http.hadLogin()) {
-				this.user = userStore.getUserInfo()
-				this.noLogin = false
-				var params = {
-					userId: this.user.id
-				}
-				userStatus(params, {}).then(res => {
-					this.status = {
-						...res
-					}
-				})
-
-			} else {
+			}else{
 				this.noLogin = true
-				this.user.avatar = '/static/unLogin.png'
 			}
+			
 		}
 	}
 </script>
@@ -351,8 +367,19 @@
 			flex-direction: column;
 			justify-content: space-around;
 			background-color: #fefefe;
+			align-items: center;
 			position: relative;
-
+			.head-left{
+				width: 300rpx;
+				height: 300rpx;
+				image{
+					width: 100%;
+					height: 100%;
+				}
+			}
+			.head-right{
+				
+			}
 			.set-content {
 				position: absolute;
 				top: 20rpx;

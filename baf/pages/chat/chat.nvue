@@ -1,0 +1,427 @@
+<template>
+	<view class="chat-container">
+		<!-- 状态栏占位 -->
+		<view class="status-bar-placeholder"></view>
+
+		<!-- 导航栏 -->
+		<view class="navigation-bar">
+			<view class="return-block" @click="returnBack()">
+				<text class="return-icon">‹</text>
+			</view>
+			<view class="navigation-bar-userName-block">
+				<text class="user-name">{{toUserVo.userName || '聊天中'}}</text>
+			</view>
+			<view class="setting-block" @click="del">
+				<text class="setting-icon">···</text>
+			</view>
+		</view>
+
+		<!-- 列表区域：flex:1 确保占满剩余空间 -->
+		<list class="content-area" :show-scrollbar="false" :loadmoreoffset="100">
+			<!-- 下拉加载历史消息 -->
+			<refresh class="refresh-box" @refresh="onRefresh" :display="refreshing ? 'show' : 'hide'">
+				<text class="refresh-text">正在加载历史消息...</text>
+			</refresh>
+
+			<!-- 消息项：必须使用 cell -->
+			<cell v-for="(item, index) in chatMessage.chatList" :key="item.id || index" :ref="'msg_' + item.id">
+				<!-- 对方消息 -->
+				<view v-if="item.fromUserId === otherId && item.type === 'private'" class="status-block">
+					<view class="user-avatar-block">
+						<image v-if="item.fromUserVo.avatar" :src="item.fromUserVo.avatar" class="image-block"></image>
+					</view>
+					<view class="user-name-chat-message-block">
+						<view v-if="item.data.fileType === 'image'" class="image-content-block">
+							<image :src="item.data.fileUrl" mode="widthFix" class="message-image"></image>
+						</view>
+						<view v-else-if="item.data.fileType === 'video'" class="video-content-block">
+							<video :src="item.data.fileUrl" class="message-video"></video>
+						</view>
+						<view v-else class="bubble-container">
+							<view class="bubble-content other-bubble-content">
+								<text class="message-text">{{item.data.content}}</text>
+							</view>
+						</view>
+					</view>
+				</view>
+
+				<!-- 自己消息 -->
+				<view v-else-if="item.fromUserId === userId && item.type === 'private'" class="self-status-block">
+					<view class="self-user-name-chat-message-block">
+						<view v-if="item.data.fileType === 'image'" class="image-content-block">
+							<image :src="item.data.fileUrl" mode="widthFix" class="message-image"></image>
+						</view>
+						<view v-else class="bubble-container">
+							<view class="bubble-content my-bubble-content">
+								<text class="message-text">{{item.data.content}}</text>
+							</view>
+						</view>
+					</view>
+					<view class="self-user-avatar-block">
+						<image v-if="item.fromUserVo.avatar" :src="item.fromUserVo.avatar" class="image-block"></image>
+					</view>
+				</view>
+			</cell>
+
+			<!-- 底部占位：替代 anchor -->
+			<cell>
+				<view ref="bottomAnchor" style="height: 20rpx;"></view>
+			</cell>
+		</list>
+
+		<!-- 输入框区域 -->
+		<view class="input-send-file-block">
+			<view class="input-block">
+				<input v-model="content" class="input-field" :cursor-spacing="20" @confirm="sendMessage"
+					placeholder="请输入内容..." />
+			</view>
+			<view class="send-block" @click="sendMessage">
+				<image :src="content.trim() === '' ? '/static/send.png' : '/static/sendable.png'" class="send-icon">
+				</image>
+			</view>
+			<view class="file-block" @click="chooseFile">
+				<image src="/static/fileChoose.png" class="file-icon"></image>
+			</view>
+		</view>
+	</view>
+</template>
+
+<script>
+	const dom = uni.requireNativePlugin('dom'); // Nvue 滚动定位必须
+	import {
+		getHistoryChatMessage
+	} from '@/utils/message/message'
+	import userStore from '@/store/localStore/index.js'
+	import messageStore from '@/store/message/index.js'
+
+	export default {
+		data() {
+			return {
+				otherId: null,
+				userId: null,
+				p2pId: null,
+				fromUserVo: {},
+				toUserVo: {},
+				chatMessage: {
+					chatList: []
+				},
+				current: 0,
+				newCount: 0,
+				size: 15,
+				content: '',
+				refreshing: false,
+				hasMoreMessage: true,
+				isReturn: false,
+				isSendMsg: false,
+			}
+		},
+		onLoad(opt) {
+			uni.$on("chatMessage", this.handleReceiveMessage);
+			this.userId = userStore.getUserid();
+			if (opt.otherId) this.otherId = Number(opt.otherId);
+			if (opt.p2pId) this.p2pId = Number(opt.p2pId);
+			this.initChatMessageList();
+		},
+		onUnload() {
+			uni.$off('chatMessage', this.handleReceiveMessage);
+		},
+		methods: {
+			initChatMessageList() {
+				const res = messageStore.getChatWindowMessage(0, this.size, this.otherId);
+				this.chatMessage = res;
+				this.p2pId = res.p2pId || this.p2pId;
+				this.current = this.chatMessage.chatList.length;
+
+				if (this.chatMessage.chatList.length > 0) {
+					const firstMsg = this.chatMessage.chatList[0];
+					if (firstMsg.fromUserId === Number(this.userId)) {
+						this.fromUserVo = firstMsg.fromUserVo;
+						this.toUserVo = firstMsg.toUserVo;
+					} else {
+						this.fromUserVo = firstMsg.toUserVo;
+						this.toUserVo = firstMsg.fromUserVo;
+					}
+				}
+				this.scrollToBottom();
+				this.clearUnreadBadge();
+			},
+			clearUnreadBadge() {
+				// 假设你的 messageStore 中有一个获取当前会话未读数的方法
+				// 如果没有 getUnreadCount 方法，你需要去 store/message/index.js 里写一个
+				let unreadCount = 0;
+
+				if (messageStore.getUnreadCount) {
+					unreadCount = messageStore.getUnreadCount(this.p2pId || this.otherId);
+				} else {
+					// 兼容处理：如果没有单独获取未读数的方法，默认给个保底策略
+					// 建议去 store 完善逻辑
+					unreadCount = this.chatMessage.chatList.filter(msg => !msg.isRead && msg.fromUserId !== this.userId)
+						.length || 0;
+				}
+
+				if (unreadCount > 0) {
+					// 1. 调用 store 方法，把当前 p2pId 的消息标记为已读
+					if (messageStore.clearUnreadMessage) {
+						messageStore.clearUnreadMessage(this.p2pId || this.otherId);
+					}
+
+					// 2. 触发全局事件，让 App.vue 把底部的 tabBar 气泡减掉对应的数量
+					uni.$emit('subMessageTabbarBadge', unreadCount);
+				}
+			},
+			// 下拉加载
+			onRefresh() {
+				if (this.refreshing || !this.hasMoreMessage) {
+					this.refreshing = false;
+					return;
+				}
+				this.refreshing = true;
+
+				// 记录当前最顶部的消息
+				const topMsg = this.chatMessage.chatList[0];
+
+				const params = {
+					p2pId: this.p2pId,
+					otherId: this.otherId,
+					current: this.chatMessage.chatList.length,
+					size: this.size
+				};
+
+				getHistoryChatMessage(params).then(res => {
+					if (!res || res.length === 0) {
+						this.hasMoreMessage = false;
+					} else {
+						// 假设后端返回是时间正序
+						this.chatMessage.chatList = [...res, ...this.chatMessage.chatList];
+						this.current += res.length;
+						res.forEach(m => messageStore.saveChatMessage(m));
+
+						// Nvue 加载历史后的滚动锁定
+						if (topMsg) {
+							this.$nextTick(() => {
+								dom.scrollToElement(this.$refs['msg_' + topMsg.id][0], {
+									offset: 0,
+									animated: false
+								});
+							});
+						}
+					}
+				}).finally(() => {
+					this.refreshing = false;
+				});
+			},
+
+			sendMessage() {
+				if(this.isSendMsg) return
+				this.isSendMsg = true
+				if (this.content.trim() === '') return;
+				const data = {
+					id: Date.now(), // 临时ID
+					type: 'private',
+					fromUserId: Number(this.userId),
+					toUserId: this.otherId,
+					fromUserVo: this.fromUserVo,
+					toUserVo: this.toUserVo,
+					p2pId: this.p2pId,
+					data: {
+						content: this.content
+					}
+				};
+
+				this.chatMessage.chatList.push(data);
+				this.newCount += 1;
+				uni.$webSocketManager.send(data);
+				this.content = '';
+				this.scrollToBottom();
+				setTimeout(()=>{
+					this.isSendMsg = false
+				},800)
+			},
+
+			handleReceiveMessage(message) {
+				if (message.p2pId === this.p2pId) {
+					if (message.fromUserId === Number(this.userId)) return;
+					this.chatMessage.chatList.push(message);
+					this.newCount += 1;
+					this.scrollToBottom();
+					if (messageStore.clearUnreadMessage) {
+						messageStore.clearUnreadMessage(this.p2pId);
+					}
+					// 立刻把 App.vue 刚加上的 1 个红点减掉
+					uni.$emit('subMessageTabbarBadge', 1);
+				}
+			},
+
+			scrollToBottom() {
+				this.$nextTick(() => {
+					setTimeout(() => {
+						if (this.$refs.bottomAnchor) {
+							dom.scrollToElement(this.$refs.bottomAnchor, {
+								offset: 0,
+								animated: true
+							});
+						}
+					}, 100);
+				});
+			},
+
+			returnBack() {
+				if (this.isReturn) return
+				this.isReturn = true
+				uni.navigateBack({
+					complete:()=> {
+						setTimeout(() => {
+							this.isReturn = false
+						}, 800)
+					}
+				});
+
+			}
+		}
+	}
+</script>
+
+<style scoped>
+	.chat-container {
+		flex: 1;
+		/* Nvue必须 flex:1 */
+		background-color: #f5f5f5;
+	}
+
+	.status-bar-placeholder {
+		height: 80rpx;
+		background-color: #ffffff;
+	}
+
+	.navigation-bar {
+		height: 100rpx;
+		background-color: #ffffff;
+		flex-direction: row;
+		align-items: center;
+		justify-content: space-between;
+		border-bottom-width: 1rpx;
+		border-bottom-color: #f0f0f0;
+	}
+
+	.content-area {
+		flex: 1;
+		/* 占据剩余全部高度 */
+		background-color: #f5f5f5;
+	}
+
+	.refresh-box {
+		width: 750rpx;
+		height: 100rpx;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.refresh-text {
+		color: #999999;
+		font-size: 24rpx;
+	}
+
+	/* 消息通用样式 */
+	.status-block {
+		width: 750rpx;
+		flex-direction: row;
+		padding: 20rpx;
+	}
+
+	.self-status-block {
+		width: 750rpx;
+		flex-direction: row;
+		justify-content: flex-end;
+		padding: 20rpx;
+	}
+
+	.user-avatar-block,
+	.self-user-avatar-block {
+		width: 80rpx;
+		height: 80rpx;
+	}
+
+	.image-block {
+		width: 80rpx;
+		height: 80rpx;
+		border-radius: 40rpx;
+	}
+
+	.bubble-container {
+		margin: 0 20rpx;
+		flex-direction: column;
+	}
+
+	.bubble-content {
+		padding: 15rpx 20rpx;
+		border-radius: 12rpx;
+		align-items: flex-start;
+	}
+
+	.other-bubble-content {
+		background-color: #ffffff;
+	}
+
+	.my-bubble-content {
+		background-color: #95ec69;
+	}
+
+	.message-text {
+		font-size: 30rpx;
+		color: #333333;
+		line-height: 40rpx;
+		max-width: 480rpx;
+		lines: 0;
+		word-wrap: break-word;
+		word-break: break-all;
+	}
+
+	.message-image {
+		width: 300rpx;
+		border-radius: 10rpx;
+		margin: 0 20rpx;
+	}
+
+	/* 输入区域 */
+	.input-send-file-block {
+		height: 110rpx;
+		flex-direction: row;
+		align-items: center;
+		background-color: #ffffff;
+		padding: 0 20rpx;
+		border-top-width: 1rpx;
+		border-top-color: #eeeeee;
+	}
+
+	.input-block {
+		flex: 1;
+		background-color: #f8f8f8;
+		height: 70rpx;
+		border-radius: 10rpx;
+		padding: 0 20rpx;
+		justify-content: center;
+	}
+
+	.input-field {
+		height: 70rpx;
+		font-size: 28rpx;
+	}
+
+	.send-icon,
+	.file-icon {
+		width: 55rpx;
+		height: 55rpx;
+		margin-left: 20rpx;
+	}
+
+	.return-icon {
+		font-size: 60rpx;
+		margin-left: 20rpx;
+	}
+
+	.user-name {
+		font-size: 32rpx;
+		font-weight: bold;
+	}
+	
+</style>

@@ -46,5 +46,28 @@ export const otherUserDetail = (params = {}, config = {}) =>{
 		params,
 		config
 	)
-	
+}
+
+export const attentionUser = (params = {}, config = {}) => {
+	return http.get(
+		'server/user/attentionUser',
+		params,
+		config
+	)
+}
+
+export const userInfo = (params = {},config = {}) => {
+	return http.get(
+		'server/user/userInfo',
+		params,
+		config
+	)
+}
+
+export const saveUserInfo = (data = {}, config = {}) => {
+	return http.post(
+		'server/user/saveUserInfo',
+		data,
+		config
+	)
 }

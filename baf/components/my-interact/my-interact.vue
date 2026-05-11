@@ -72,18 +72,30 @@
 			return {
 				likeAnimate: false,
 				collectAnimate: false,
-				commentAnimate: false
+				commentAnimate: false,
+				isHandleLike:false,
+				isHandleComment:false,
+				isHandleCollect:false
 			}
 		},
 		methods: {
 			handleLike() {
+				if(this.isHandleLike) return
+				this.isHandleLike = true
 				if(!http.hadLogin()){
 					uni.showToast({
 						title:'该操作需要先登录，请先登录',
 						icon:'none'
 					}),
 					uni.navigateTo({
-						url:'/pages/loginAndRegister/loginAndRegister'
+						url:'/pages/loginAndRegister/loginAndRegister',
+						complete:()=> {
+							setTimeout(()=>{
+								setTimeout(()=>{
+									this.isHandleLike = false
+								},800)
+							})
+						}
 					})
 				}
 				if (!this.likeAnimate) {
@@ -94,15 +106,25 @@
 					}
 					this.$emit('like-click', params,this.current,this.postIndex);
 				} 
+				setTimeout(()=>{
+					this.isHandleLike = false
+				},800)
 			},
 			handleCollect() {
+				if(this.isHandleCollect) return
+				this.isHandleCollect = true
 				if(!http.hadLogin()){
 					uni.showToast({
 						title:'该操作需要先登录，请先登录',
 						icon:'none'
 					}),
 					uni.navigateTo({
-						url:'/pages/loginAndRegister/loginAndRegister'
+						url:'/pages/loginAndRegister/loginAndRegister',
+						complete:()=> {
+							setTimeout(()=>{
+								this.isHandleCollect = false
+							},800)
+						}
 					})
 				}
 				if (!this.collectAnimate) {
@@ -113,12 +135,22 @@
 					}
 					this.$emit('collect-click', blog,this.current,this.postIndex);
 				}
+				setTimeout(()=>{
+					this.isHandleCollect = false
+				},800)
 			},
 			handleComment() {
+				if(this.isHandleComment) return
+				this.isHandleComment = true
 				this.commentAnimate = true; 
 				//跳转用户详情页面
 				uni.navigateTo({
-					url:`/pages/postDetails/postDetails?postId=${this.id}`
+					url:`/pages/postDetails/postDetails?postId=${this.id}`,
+					complete:()=> {
+						setTimeout(()=>{
+							this.isHandleComment = false
+						},800)
+					}
 				})
 			}
 		}

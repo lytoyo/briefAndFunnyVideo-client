@@ -5,6 +5,7 @@ import store from './store'
 import i18n from './i18n/index.js'
 import GlobalStatusBar from '@/components/global-status-bar/global-status-bar.vue'
 import BASE_URL from '@/config/index.js'
+
 Vue.component('global-status-bar', GlobalStatusBar)
 Vue.config.productionTip = false
 
@@ -18,5 +19,7 @@ const app = new Vue({
   BASE_URL,
   ...App
 })
+
+
 
 app.$mount()

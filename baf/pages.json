@@ -11,7 +11,7 @@
 
 		},
 		{
-			"path": "pages/chat/chat",
+			"path": "pages/message/message",
 			"style": {
 				"app-plus": {
 					"scrollIndicator": "none"
@@ -38,7 +38,7 @@
 
 		},
 		{
-			"path": "pages/chat/chat",
+			"path": "pages/message/message",
 			"style": {
 				"app-plus": {
 					"scrollIndicator": "none"
@@ -99,6 +99,40 @@
 					"scrollIndicator": "none"
 				}
 			}
+		},
+		{
+			"path": "pages/chat/chat",
+			"style": {
+					"disableScroll": true,
+					"app-plus": {
+						"titleNView": false
+					}
+				},
+			"type": "nvue"
+		},
+		{
+			"path": "pages/search/search",
+			"style": {
+				"navigationBarTitleText": ""
+			}
+		},
+		{
+			"path": "pages/resultPage/resultPage",
+			"style": {
+				"navigationBarTitleText": ""
+			}
+		},
+		{
+			"path": "pages/set/set",
+			"style": {
+				"navigationBarTitleText": ""
+			}
+		},
+		{
+			"path": "pages/resetPassword/resetPassword",
+			"style": {
+				"navigationBarTitleText": ""
+			}
 		}
 	],
 
@@ -113,8 +147,8 @@
 			},
 
 			{
-				"pagePath": "pages/chat/chat",
-				"text": "聊天"
+				"pagePath": "pages/message/message",
+				"text": "消息"
 			},
 			{
 				"pagePath": "pages/mime/mime",
@@ -139,9 +173,7 @@
 	"globalStyle": {
 		"navigationBarBackgroundColor": "#F8F8F8",
 		"dynamicRpx": true,
-		"backgroundColor": "#37f8f8",
 		"navigationStyle": "custom",
-		"backgroundColorTop": "#007aff",
 		"navigationBarTitleText": "拟合"
 	},
 	"uniIdRouter": {}

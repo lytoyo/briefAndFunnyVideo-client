@@ -165,15 +165,24 @@
 
 	export default {
 		created() {
-			this.device = getDeviceInfo()
-			uni.$on('openChildComment', (data) => {
-				this.init(data)
-			})
-			uni.$on('resetChildComment',()=>{
-				this.reset()
-			})
+		  this.device = getDeviceInfo()
+		
+		  uni.$on('openChildComment', this.handleOpenChildComment)
+		  uni.$on('resetChildComment', this.handleResetChildComment)
+		
+		  // 只注册一次
+		  uni.$on('changeInputVal', this.handleChangeInputVal)
+		  uni.$on('comment', this.handleNewComment)
+		},
+
+		beforeDestroy() {
+		  this.unbindEvents()
 		},
 		
+		destroyed() {
+		  this.unbindEvents()
+		},
+
 		
 		onReady() {
 			// 页面准备好后再获取
@@ -615,12 +624,169 @@
 		},
 		methods: {
 			init(data) {
-				this.parentComment = data.comment
-				this.postId = data.postDetail.id
-				this.childCommentList = []
-					
-				this.getChildCommentList()
+			  this.reset()
+			
+			  this.parentComment = data.parentComment || {}
+			  this.postId = data.postId
+			
+			  this.current = 1
+			  this.size = 5
+			  this.pages = 0
+			  this.flag = true
+			
+			  this.getChildCommentList()
+			  this.initImg()
 			},
+
+			unbindEvents() {
+			  uni.$off('openChildComment', this.handleOpenChildComment)
+			  uni.$off('resetChildComment', this.handleResetChildComment)
+			  uni.$off('changeInputVal', this.handleChangeInputVal)
+			  uni.$off('comment', this.handleNewComment)
+			},
+handleOpenChildComment(data) {
+  this.init(data)
+},
+
+handleResetChildComment() {
+  this.reset()
+},
+
+handleChangeInputVal(data) {
+  if (!data) return
+
+  this.fileList = Array.isArray(data.fileList) ? [...data.fileList] : []
+  this.remark = data.remark || ''
+  this.mediaFlag = data.mediaFlag || 0
+
+  this.$forceUpdate()
+},
+
+handleNewComment(comment) {
+  this.addChildCommentOnce(comment, 'unshift')
+  this.$forceUpdate()
+},
+
+			getCommentKey(comment) {
+			  if (!comment) return ''
+			
+			  if (comment.id !== null && comment.id !== undefined) {
+			    return String(comment.id)
+			  }
+			
+			  const userId = comment.userVo && comment.userVo.id
+			    ? comment.userVo.id
+			    : ''
+			
+			  return [
+			    comment.postId || this.postId || '',
+			    comment.parentId || this.parentComment.id || '',
+			    userId,
+			    comment.publicTime || '',
+			    comment.comment || '',
+			    comment.fileName || ''
+			  ].join('_')
+			},
+			
+			hasRenderedComment(comment) {
+			  const key = this.getCommentKey(comment)
+			
+			  if (!key) return true
+			
+			  return this.renderedCommentKeyList.includes(key)
+			},
+			
+			markRenderedComment(comment) {
+			  const key = this.getCommentKey(comment)
+			
+			  if (!key) return
+			
+			  if (!this.renderedCommentKeyList.includes(key)) {
+			    this.renderedCommentKeyList.push(key)
+			  }
+			},
+			
+			addNewCommentId(comment) {
+			  if (!comment || comment.id === null || comment.id === undefined) return
+			
+			  const id = String(comment.id)
+			
+			  if (!this.newCommentIdList.includes(id)) {
+			    this.newCommentIdList.push(id)
+			  }
+			},
+			
+			getCommentUniqueKey(comment) {
+			  if (!comment) return null
+			
+			  // 优先使用数据库 id
+			  if (comment.id !== null && comment.id !== undefined) {
+			    return 'id_' + comment.id
+			  }
+			
+			  // 如果有前端临时 id，也可以兜底
+			  if (comment.clientId) {
+			    return 'client_' + comment.clientId
+			  }
+			
+			  return null
+			},
+			
+			addChildCommentOnce(comment, position = 'push') {
+			  if (!comment) return false
+			
+			  const key = this.getCommentUniqueKey(comment)
+			
+			  if (!key) {
+			    return false
+			  }
+			
+			  // 第一层：检查 key 列表
+			  if (this.renderedCommentKeyList.includes(key)) {
+			    return false
+			  }
+			
+			  // 第二层：直接检查 childCommentList，防止 renderedCommentKeyList 状态丢失
+			  const exists = this.childCommentList.some(item => {
+			    return this.getCommentUniqueKey(item) === key
+			  })
+			
+			  if (exists) {
+			    this.renderedCommentKeyList.push(key)
+			    return false
+			  }
+			
+			  this.renderedCommentKeyList.push(key)
+			
+			  if (position === 'unshift') {
+			    this.childCommentList.unshift(comment)
+			  } else {
+			    this.childCommentList.push(comment)
+			  }
+			
+			  return true
+			},
+
+			
+			addChildCommentListOnce(list, position = 'push') {
+			  if (!Array.isArray(list) || list.length === 0) return
+			
+			  list.forEach(comment => {
+			    this.addChildCommentOnce(comment, position)
+			  })
+			},
+
+			
+			rebuildRenderedCommentKeys() {
+			  this.renderedCommentKeyList = []
+			
+			  if (!Array.isArray(this.childCommentList)) return
+			
+			  this.childCommentList.forEach(comment => {
+			    this.markRenderedComment(comment)
+			  })
+			},
+
 			imgCss(index){
 				const device = this.device
 				if(!device) return{}
@@ -640,27 +806,36 @@
 				return baseStyle
 			},
 			getChildCommentList() {
-				if (!this.flag) {
-					return;
-				}
-				let params = {
-					current: this.current,
-					size: this.size,
-					type: 1, //没有任何排列
-					parentId: this.parentComment.id,
-					postId: this.postId
-				}
-				gainPostComment(params, {}).then(res => {
-					const filterdRes = res.commentList.filter(comment=> !this.newCommentIdList.includes(comment.id))
-					this.childCommentList.push(...filterdRes)
-					this.current = res.current + 1
-					this.pages = res.pages
-					if (this.current > this.pages) {
-						this.flag = false
-					}
-				})
-				this.initImg()
+			  if (!this.flag) {
+			    return
+			  }
+			
+			  let params = {
+			    current: this.current,
+			    size: this.size,
+			    type: 1,
+			    parentId: this.parentComment.id,
+			    postId: this.postId
+			  }
+			
+			  gainPostComment(params, {}).then(res => {
+			    const list = Array.isArray(res.commentList) ? res.commentList : []
+			
+			    this.addChildCommentListOnce(list, 'push')
+			
+			    this.current = res.current + 1
+			    this.pages = res.pages
+			
+			    if (this.current > this.pages) {
+			      this.flag = false
+			    }
+			
+			    this.$forceUpdate()
+			  })
+			
+			  this.initImg()
 			},
+
 			initImg() {
 				if (this.parentComment.fileType !== null && this.parentComment.fileType === 'image') {
 					this.processImageUrls(this.parentComment.fileName)
@@ -770,82 +945,89 @@
 					url: "/pages/userDetail/userDetail?id=" + id
 				})
 			},
-			openInput(){
-				uni.$emit('openInput',{
-					postId:this.postId,
-					parentId:this.parentComment.id,
-					fileList:this.fileList,
-					mediaFlag:this.mediaFlag,
-					remark:this.remark
-				})
-				this.inputPopup.show('slide-in-bottom',600,()=>{
-					uni.$on('changeInputVal',(data)=>{
-						this.fileList = [...data.fileList]
-						this.remark = data.remark
-						this.mediaFlag = data.mediaFlag
-						// 强制更新视图
-						this.$forceUpdate()
-						
-					})
-					
-					uni.$on('comment',(data)=>{
-						
-						this.childCommentList.unshift(data)
-						this.newCommentIdList.push(data.id)
-						this.inputPopup.hide()
-						this.$forceUpdate()
-						
-						this.$nextTick(() => {
-						    this.$forceUpdate()
-						    // 滚动到最新评论位置
-						    uni.pageScrollTo({
-						        scrollTop: 0,
-						        duration: 300
-						    })
-						})
-					})
-				})
+			openInput() {
+			  uni.$emit('openInput', {
+			    postId: this.postId,
+			    parentId: this.parentComment.id,
+			    fileList: this.fileList,
+			    mediaFlag: this.mediaFlag,
+			    remark: this.remark
+			  })
+			
+			  if (this.inputPopup) {
+			    this.inputPopup.show('slide-in-bottom', 600)
+			  }
 			},
-			childComment(){
-				let data = {
-					postId:this.postId,
-					parentId:this.parentComment.id,
-					comment:this.remark,
-					fileType:this.mediaFlag === 0 ? null : this.mediaFlag === 1 ? 'image' : 'video',
-					fileName:this.mediaFlag === 0 ? null : this.mediaFlag === 1 ? this.mergeStr() : this.fileList[0].fileName,
-					cover:this.mediaFlag === 2 ? this.fileList[0].cover : null
-				}
-				comment(data,{}).then(res=>{
-					this.childCommentList.unshift(res)
-					this.newCommentIdList.push(res.id)
-					this.remark = ''
-					this.fileList = []
-					this.mediaFlag = 0
-					this.$forceUpdate()
-					
-					this.$nextTick(() => {
-					    this.$forceUpdate()
-					    // 滚动到最新评论位置
-					    uni.pageScrollTo({
-					        scrollTop: 0,
-					        duration: 300
-					    })
-					})
-				})
+			childComment() {
+			  const content = this.remark ? this.remark.trim() : ''
+			  const hasFile = Array.isArray(this.fileList) && this.fileList.length > 0
+			
+			  if (!content && !hasFile) {
+			    return
+			  }
+			
+			  let data = {
+			    postId: this.postId,
+			    parentId: this.parentComment.id,
+			    comment: content,
+			    fileType: this.mediaFlag === 0 ? null : this.mediaFlag === 1 ? 'image' : 'video',
+			    fileName: this.mediaFlag === 0
+			      ? null
+			      : this.mediaFlag === 1
+			        ? this.mergeStr()
+			        : this.fileList[0]
+			          ? this.fileList[0].fileName
+			          : null,
+			    cover: this.mediaFlag === 2 && this.fileList[0]
+			      ? this.fileList[0].cover
+			      : null
+			  }
+			
+			  comment(data, {}).then(res => {
+			    const added = this.addChildCommentOnce(res, 'unshift')
+			
+			    this.remark = ''
+			    this.fileList = []
+			    this.mediaFlag = 0
+			
+			    if (!added) {
+			      return
+			    }
+			
+			    this.$forceUpdate()
+			
+			    this.$nextTick(() => {
+			      this.$forceUpdate()
+			
+			      uni.pageScrollTo({
+			        scrollTop: 0,
+			        duration: 300
+			      })
+			    })
+			  })
 			},
+
 			mergeStr(){
 				const str = this.fileList.map(item => item.fileName).join(",")
 				return str
 			},
-			reset(){
-				this.postId = null
-				this.current = 1
-				this.size = 5
-				this.pages = 0
-				this.flag = true
-				this.parentComment = {},
-				this.childCommentList = []
-			}
+			reset() {
+			  this.postId = null
+			  this.current = 1
+			  this.size = 5
+			  this.pages = 0
+			  this.flag = true
+			  this.parentComment = {}
+			  this.childCommentList = []
+			
+			  this.fileList = []
+			  this.mediaFlag = 0
+			  this.remark = ''
+			
+			  // 重要：重置已渲染 key
+			  this.renderedCommentKeyList = []
+			},
+
 		},
 
 		data() {
@@ -863,6 +1045,7 @@
 				fileList:[],
 				mediaFlag:0,
 				newCommentIdList:[],
+				renderedCommentKeyList: [],
 				remark:'',
 				placeholder:'说说看法吧',
 				inputPopup:null

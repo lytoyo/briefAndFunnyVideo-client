@@ -2,16 +2,34 @@
 	<view class="container">
 		<global-status-bar />
 		<view class="header">
-			<view class="set-content" @click="goToSettings">
-				<image class="set-icon" src="/static/set.png"></image>
-			</view>
+			
 			<uni-row class="head-profile">
 				<view class="image-content">
-					<image :src="user.avatar"></image>
+					<image :src="user.avatar"  mode="aspectFill"></image>
 				</view>
 			</uni-row>
 			<uni-row class="head-userName">
 				<view class="userName-content">@{{user.userName}}</view>
+			</uni-row>
+			<uni-row v-if="!isSelf()" class="attention-chat" :gutter="8" >
+				<uni-col class="attention-col" :span="8" :offset="4">
+					<view class="attention-block" :style="{'background-color' : status.isAttention ? '#eee' : '#ff6996',
+															'color' : status.isAttention ? '#696969' : '#fff'}">
+						<view class="attention-icon" @click="attentionUser(user.id)">
+							<uni-icons v-if="!status.isAttention" type="plusempty" size="20" color="#ffffff"></uni-icons>
+							<uni-icons v-else-if="status.isAttention" type="checkmarkempty" size="20" color="#dadada"></uni-icons>
+						</view>
+						<view class="font-block">{{status.isAttention ? '已关注' : '关注'}}</view>
+					</view>
+				</uni-col>
+				<uni-col class="chat-col" :span="8" :offset="2">
+					<view class="chat-block" @click="chatToUser(user.id)">
+						<view class="chat-icon">
+							<uni-icons type="chatbubble" size="25" color="#2b2b2b"></uni-icons>
+						</view>
+						<view class="font-block" >私聊</view>
+					</view>
+				</uni-col>
 			</uni-row>
 			<uni-row :gutter="8" class="head-status">
 				<uni-col :span="8" class="status-content">
@@ -27,11 +45,6 @@
 					<view class="content-sty">粉丝</view>
 				</uni-col>
 			</uni-row>
-			<uni-row class="head-follow" v-if="!isSelf">
-				<uni-fav class="fav-sty" :checked="checked" :star="false" bg-color="#eeeeee" bgColorChecked="#ee1a5d"
-					fg-color="#000000" fgColorChecked="#f6f6f6" :content-text="contentText"
-					@click="attentionClick(event)" />
-			</uni-row>
 			<uni-row class="head-intro">
 				{{introIsEmpty(user.intro)}}
 			</uni-row>
@@ -42,9 +55,9 @@
 				in-active-color="#000" @clickItem="onClickItem" />
 		</view>
 		<view class="bottom">
-			<uni-grid v-if="current === 0 && postList.length > 0" :column="3" :highlight="true" @change="skipDetail">
+			<uni-grid v-if="current === 0 && postList.length > 0" :column="3" :highlight="true" >
 				<uni-grid-item v-for="(item, index) in postList" :index="index" :key="index">
-					<view class="grid-item-box">
+					<view class="grid-item-box" @click="skipPostDetail(item.id)">
 						<!-- 图片容器，使用相对定位 -->
 						<view class="image-container">
 							<image :src="item.cover" mode="aspectFill" class="post-image" />
@@ -63,9 +76,9 @@
 				<view>{{$t('mime.noPostContent')}}</view>
 				<view>{{$t('mime.postDisplay')}}</view>
 			</view>
-			<uni-grid v-if="current === 1 && likedList.length > 0" :column="3" :highlight="true" @change="skipDetail">
+			<uni-grid v-if="current === 1 && likedList.length > 0" :column="3" :highlight="true" >
 				<uni-grid-item v-for="(item, index) in likedList" :index="index" :key="index">
-					<view class="grid-item-box">
+					<view class="grid-item-box" @click="skipPostDetail(item.id)">
 						<!-- 图片容器，使用相对定位 -->
 						<view class="image-container">
 							<image :src="item.cover" mode="aspectFill" class="post-image" />
@@ -82,9 +95,9 @@
 				<view>{{$t('mime.noLikedContent')}}</view>
 				<view>{{$t('mime.likedDisplay')}}</view>
 			</view>
-			<uni-grid v-if="current === 2 && collectList.length > 0" :column="3" :highlight="true" @change="skipDetail">
+			<uni-grid v-if="current === 2 && collectList.length > 0" :column="3" :highlight="true">
 				<uni-grid-item v-for="(item, index) in collectList" :index="index" :key="index">
-					<view class="grid-item-box">
+					<view class="grid-item-box" @click="skipPostDetail(item.id)">
 						<!-- 图片容器，使用相对定位 -->
 						<view class="image-container">
 							<image :src="item.cover" mode="aspectFill" class="post-image" />
@@ -115,9 +128,18 @@
 		askPost,
 		selfPostList,
 		likedPostList,
-		collectPostList
+		collectPostList,
+		attentionUser
 	} from '@/utils/user/index.js';
+	import {
+		checkP2pId,
+		createPrivateWindow,
+		gainChatMessage
+		} from '@/utils/message/message.js'
+	import messageApi from '@/store/message/index.js'
 	import user from '../../store/modules/user';
+import { sendMessage } from '../../utils/websocket';
+import messageStore from '@/store/message/index.js'
 	export default {
 		onLoad(e) {
 			const userId = Number(e.id)
@@ -132,7 +154,7 @@
 					sex: undefined,
 					avatar: '/static/unLogin.png',
 					intro: undefined,
-					province: undefined,
+					province: undefined,	
 					city: undefined
 				},
 				status: {},
@@ -173,7 +195,9 @@
 					contentdown: this.$t('mime.contentdown'),
 					contentrefresh: this.$t('mime.contentrefresh'),
 					contentnomore: this.$t('mime.contentnomore'),
-				}
+				},
+				isAttention:false,
+				
 			}
 		},
 		onReachBottom() {
@@ -242,19 +266,105 @@
 				}
 
 			},
-			skipDetail(e) {
-				let {
-					index
-				} = e.detail
-				//点击贴子跳转到贴子详情
-				if (this.current === 0) {
-					
-				} else if (this.current === 1) {
-
-				} else {
-
+			attentionUser(userId){
+				if(this.isAttention) return
+				this.isAttention = true
+				if(http.getToken() === null || 
+				   http.getToken() === undefined || 
+				   userStore.getUserid() === null || 
+				   userStore.getUserid() === undefined){
+					uni.showModal({
+						content:'该操作需要登录，是否前往登录？',
+						success(res) {
+							if(res.confirm){
+								uni.navigateTo({
+									url:'/pages/loginAndRegister/loginAndRegister'
+								})
+							}
+						},
+						complete: () => {
+							setTimeout(()=>{
+								this.isAttention = false
+							},800)
+						}
+					})
+					return
 				}
-
+				attentionUser({userId:userId},{}).then((res)=>{
+					this.status.isAttention = res
+				}).finally(()=>{
+					setTimeout(()=>{
+						this.isAttention = false
+					})
+				})
+			},
+			chatToUser(userId){
+				if(http.getToken() === null ||
+				   http.getToken() === undefined || 
+				   userStore.getUserid() === null || 
+				   userStore.getUserid() === undefined){
+					uni.showModal({
+						content:'该操作需要登录，是否前往登录？',
+						success(res) {
+							if(res.confirm){
+								uni.navigateTo({
+									url:'/pages/loginAndRegister/loginAndRegister'
+								})
+							}
+						},
+						
+					})
+					return
+				}
+				
+				//查看p2pId是否存在
+				checkP2pId({otherId:userId},{}).then((res)=>{	
+					//p2pId不存在
+					if(res === -1){
+						let fromUserId = userStore.getUserid()
+						//创建私聊窗口
+						createPrivateWindow({
+							"fromUserId": fromUserId,
+							"toUserId": userId
+						},{}).then((cpwRes)=>{
+							if(typeof cpwRes === 'object'){
+								//res为新建窗口的第一条系统消息，存入本地缓存
+								messageApi.saveChatMessage(cpwRes)
+								uni.navigateTo({
+									url:'/pages/chat/chat?otherId=' + userId + '&p2pId=' + cpwRes.p2pId,
+									
+								})
+							}
+						})
+					}else{
+						//如果服务器存在p2pId，但是本地不存在该信息，需要从服务器获取信息
+						let chatMessage = messageApi.getChatWindowMessage(0,1,userId)
+						if(chatMessage === undefined){
+							
+							let params = {
+								p2pId:res,
+								otherId:userId,
+								current:1,
+								size:10
+							}
+							gainChatMessage(params,{}).then((msgRes)=>{
+								//构建私聊窗口存储
+								for(let i = 0 ; i < msgRes.length; i++){
+									messageApi.insertNewMessage(msgRes[i])
+								}
+								
+							})
+							
+							chatMessage = messageApi.getChatWindowMessage(0,1,userId)
+						}
+						
+						uni.navigateTo({
+							url:'/pages/chat/chat?otherId=' + userId + '&p2pId=' + chatMessage.p2pId,
+							
+						})
+					}
+				})
+				
 			},
 			clickLoadMore(e) {
 				switch (this.current) {
@@ -319,12 +429,18 @@
 			isSelf(){
 				var flag = true
 				if (http.hadLogin()) {
-					flag = this.userId === userStore.getUserInfo().id ? true : false
+					flag = this.user.id === userStore.getUserInfo().id ? true : false
 				}
 				return flag
 			},
-			goToSettings(){
-				//点击进入设置界面
+			
+			del() {
+				messageStore.delete()
+			},
+			skipPostDetail(e){
+				uni.navigateTo({
+					url:'/pages/postDetails/postDetails?postId='+ e
+				})
 			}
 		},
 
@@ -379,8 +495,8 @@
 					left: 50%;
 					top: 50%;
 					transform: translate(-50%, -50%);
-					height: 100%;
-					width: 32%;
+					height: 300rpx;
+					width: 300rpx;
 					border-radius: 50%;
 					overflow: hidden;
 
@@ -396,7 +512,65 @@
 				width: 100%;
 				text-align: center;
 			}
-
+			.attention-chat{
+				height: 10%;
+				width: 100%;
+				.attention-col{
+					width: 30%;
+					height: 100%;
+					.attention-block{
+						width: 100%;
+						height: 100%;
+						border-radius: 10rpx;
+						display: flex;
+						box-shadow: 0 6rpx 8rpx rgba(0, 0, 0, 0.1),
+						              0 8rpx 20rpx rgba(0, 0, 0, 0.1);
+						.attention-icon{
+							height: 100%;
+							width: 35%;
+							display: flex;
+							justify-content: center;
+							align-items: center;
+						}
+						.font-block{
+							display: flex;
+							justify-content: center;
+							align-items: center;
+							letter-spacing: 10rpx;
+						}
+					}
+				}
+				.chat-col{
+					width: 30%;
+					height: 100%;
+					.chat-block{
+						width: 100%;
+						height: 100%;
+						box-shadow: 0 4rpx 8rpx rgba(0, 0, 0, 0.1), 
+						              0 6rpx 20rpx rgba(0, 0, 0, 0.1);
+						border-radius: 10rpx;
+						display: flex;
+						background-color: white;
+						.chat-icon{
+							height: 100%;
+							width: 35%;
+							display: flex;
+							justify-content: center;
+							align-items: center;
+							
+						}
+						.font-block{
+							display: flex;
+							justify-content: center;
+							align-items: center;
+							letter-spacing: 10rpx;
+							text-align: center;
+							color: #4f4f4f;
+						}
+					}
+				}
+				
+			}
 			.head-status {
 				height: 20%;
 				width: 100%;
@@ -492,7 +666,6 @@
 						display: flex;
 						align-items: center;
 						z-index: 10;
-
 						.like-icon {
 							margin-right: 6rpx;
 							color: #f0f0f0;

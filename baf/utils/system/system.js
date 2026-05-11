@@ -24,3 +24,19 @@ export const register = (data = {},config = {}) => {
 		config
 	)
 }
+
+export const modPassword = (data = {},config = {}) => {
+	return http.post(
+		'server/system/modPassword',
+		data,
+		config
+	)	
+}
+
+export const logOff = (params = {},config = {}) => {
+	return http.post(
+		'server/system/logoff',
+		params,
+		config
+	)
+}

@@ -1,12 +1,14 @@
 <!-- components/simple-uploader.vue -->
 <template>
-	
 	<view class="simple-uploader">
 		<global-status-bar></global-status-bar>
-		<uni-easyinput :value="content" :trim="true" type="textarea" :inputBorder="false" 
-		style="width:100%; white-space:normal;margin: auto;"
-		:clearable="false"  :placeholder="$t('upload.sayAny')" />
-		<chunk-uploader ref="chunkUploader" :upload-url="uploadUrl" :content="content" @uploadFileComplate="onUploadFileComplate"/>
+		<view class="input-section">
+			<uni-easyinput v-model="content" :trim="true" type="textarea" :inputBorder="false" autoHeight
+				:clearable="false" :placeholder="$t('upload.sayAny')" placeholderStyle="color:#999;font-size:32rpx"
+				class="content-input" />
+		</view>
+		<chunk-uploader ref="chunkUploader" :upload-url="uploadUrl" :content="content"
+			@uploadFileComplate="onUploadFileComplate" />
 	</view>
 </template>
 
@@ -14,8 +16,12 @@
 	import FilePicker from '@/components/file-picker/index.vue'
 	import ChunkUploader from '@/components/chunk-uploader/index.vue'
 	import GlobalStatusBar from '../../components/global-status-bar/global-status-bar.vue'
-	import {zoneMerge} from "@/utils/file/file.js"
-	import {uploadBlog} from "@/utils/blog/blog.js"
+	import {
+		zoneMerge
+	} from "@/utils/file/file.js"
+	import {
+		uploadBlog
+	} from "@/utils/blog/blog.js"
 	export default {
 		name: 'SimpleUploader',
 		components: {
@@ -23,14 +29,14 @@
 			ChunkUploader,
 			GlobalStatusBar
 		},
-		
+
 		data() {
 			return {
-				content:undefined,
+				content: undefined,
 				uploadFiles: [],
 				isUploading: false,
 				fileCounter: 0,
-				uploadUrl:''
+				uploadUrl: ''
 			}
 		},
 
@@ -53,22 +59,22 @@
 		},
 
 		created() {
-			
+
 		},
 
 		methods: {
-			async onUploadFileComplate(files){	
+			async onUploadFileComplate(files) {
 				var filesInfo = files.filesInfo
 				var uploadQueue = files.uploadQueue
-				if(filesInfo.length > 0){
+				if (filesInfo.length > 0) {
 					//需要发送分片合并请求
-					for(var i = 0; i < filesInfo.length;i++){
+					for (var i = 0; i < filesInfo.length; i++) {
 						var fileInfo = filesInfo[i]
-						await zoneMerge(fileInfo,{})
+						await zoneMerge(fileInfo, {})
 					}
 				}
 				var fileName = ""
-				for(var j = 0; j < uploadQueue.length; j++){
+				for (var j = 0; j < uploadQueue.length; j++) {
 					fileName = uploadQueue.map(item => item.fileName).join(',');
 				}
 				//分片合并结束后需要将博客整体一起上传
@@ -78,38 +84,70 @@
 					fileType: uploadQueue.length > 0 ? uploadQueue[0].file.type : null
 				}
 				uni.showLoading({
-					title:'博客上传中，请勿关闭'
+					title: '博客上传中，请勿关闭'
 				})
-				const res = uploadBlog(blog,{})
-				uni.hideLoading()
-				if(res.code === 200){
+				uploadBlog(blog, {}).then(res => {
 					uni.showToast({
-						title:'博客上传完毕，待审核',
-						icon:'none'
-					})	
-				}else{
-					uni.showToast({
-						title:'博客上传失败，请重试',
-						icon:'none'
+						title: '博客上传完毕，待审核',
+						icon: 'none'
 					})
-				}
-				uni.switchTab({
-					url:'/pages/index/index'
+				}).catch((e) => {
+					uni.showToast({
+						title: '博客上传失败，请重试',
+						icon: 'none'
+					})
+				}).finally(() => {
+					uni.hideLoading()
+
+					uni.switchTab({
+						url: '/pages/index/index'
+					})
 				})
+
+
 			}
-		}	
+		}
 	}
 </script>
 
 <style scoped>
 	.simple-uploader {
-		width: 95%;
-		height: 100vh;
-		background: white;
-		border-radius: 12px;
-		margin-left: 20rpx;
+		width: 100%;
+		/* 改为100%更符合主流设计 */
+		min-height: 100vh;
+		background: #ffffff;
 		/* overflow-y: hidden; */
-		
+
+	}
+
+	.input-section {
+		padding: 30rpx 40rpx;
+		/* 增加呼吸感 */
+		background-color: #fff;
+	}
+
+	.content-input /deep/ .uni-easyinput__content-textarea {
+		font-size: 34rpx;
+		/* 稍微加大字体，提升可读性 */
+		line-height: 1.6;
+		/* 增加行高，防止文字拥挤 */
+		color: #333;
+		padding: 0 !important;
+		/* 移除内层多余边距 */
+		min-height: 200rpx;
+		/* 设置一个最小高度 */
+	}
+
+	.content-input /deep/ .uni-easyinput__content {
+		background-color: transparent !important;
+	}
+
+	/* 调整下方上传组件的间距 */
+	chunk-uploader {
+		margin-top: 20rpx;
+		display: block;
+		padding: 0 40rpx;
+		/* 与上方输入框对齐 */
 	}
 
 	/* 上传面板 */
