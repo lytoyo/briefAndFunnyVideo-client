@@ -24,6 +24,15 @@ export const zoneMerge = (data = {}, config={}) =>{
 	)
 }
 
+export const smallFileUpload = (filePath = {},formData = {},config = {}) => {
+	return http.upload(
+		'server/file/smallFileUpload',
+		filePath,
+		formData,
+		config
+	)
+}
+
 export const uploadCommentFile = (filePath = {},formData = {},config = {}) => {
 	return http.upload(
 		'server/file/commentFileUpload',
@@ -33,3 +42,20 @@ export const uploadCommentFile = (filePath = {},formData = {},config = {}) => {
 	)
 }
 
+export const uploadZone = (filePath = {},formData = {},config = {}) => {
+	return http.upload(
+		'server/file/uploadZone',
+		filePath,
+		formData,
+		config
+	)
+}
+
+export const userAvatar = (filePath = {},formData = {},config = {}) => {
+	return http.upload(
+		'server/file/userAvatar',
+		filePath,
+		formData,
+		config
+	)
+}

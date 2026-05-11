@@ -54,6 +54,8 @@
 
 <script>
 	import http from '../../utils/request';
+import { initManager, connect } from '@/utils/websocket.js';
+	// import {initMessageList} from '@/store/message/index.js'
 	import userStore from '@/store/localStore/index.js'
 	import {requestCode,register,login} from '@/utils/system/system.js'
 	export default {
@@ -65,7 +67,10 @@
 					password: '',
 					again: '',
 					code: '',
-				}
+				},
+				isRollback:false,
+				isToLogin:false,
+				isRegister:false
 			}
 		},
 		computed: {
@@ -137,6 +142,8 @@
 		},
 		methods: {
 			toLogin(){
+				if(this.isToLogin) return
+				this.isToLogin = true
 				this.$refs["loginForm"].validate().then(res => {
 				        if (res) {
 				            var data = {
@@ -152,9 +159,16 @@
 				                http.setToken(data.token);
 								//存储用户可视数据
 								userStore.saveUserInfo(data.user)
-								
+								 initManager(); // 确保 Manager 根据新用户ID更新配置
+								    connect();
 								uni.switchTab({
 				                    url: '/pages/index/index',
+									complete:()=> {
+										setTimeout(()=>{
+											
+											this.isToLogin = false
+										},800)
+									}
 				                });
 								
 				            }).catch(error => {
@@ -165,8 +179,13 @@
 				            });
 				        }
 				    });
+				setTimeout(()=>{
+					this.isToLogin = false
+				},800)
 			},
 			toRegister(){
+				if(this.isRegister) return
+				this.isRegister = true
 				this.$refs["registerForm"].validate().then(res=>{
 					if(res){
 						var data = {
@@ -179,24 +198,22 @@
 							
 						}
 						register(data,{}).then(res=>{
-							if(res.code === 200){
 								uni.showToast({
-									title:$t("mime.registerSuccess"),
+									title:"注册成功",
 									icon:'none'
 								})
 								this.isLogin = !this.isLogin
-							}else{
-								uni.showToast({
-									title:res.msg,
-									icon:'error'
-								})
-							}
 						}).catch(error=>{
 							uni.showToast({
 								title:$t('mime.system404')
 							})
 						})
 					}
+				})
+				setTimeout(()=>{
+					setTimeout(()=>{
+						this.isRegister = false
+					},800)
 				})
 			},
 			// 邮箱格式验证
@@ -257,8 +274,15 @@
 			},
 			
 			rollback() {
+				if(this.isRollback) return
+				this.isRollback = true
 				uni.switchTab({
-					url:'/pages/mime/mime'
+					url:'/pages/mime/mime',
+					complete:()=> {
+						setTimeout(()=>{
+							this.isRollback = false
+						},800)
+					}
 				});
 			},
 			

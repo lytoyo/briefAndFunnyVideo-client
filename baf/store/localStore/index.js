@@ -1,38 +1,43 @@
 import http from "@/utils/request.js";
 
 export default {
-	
+
 	//保存用户数据
-	saveUserInfo(userInfo){
-		uni.setStorage({
-			key:'userInfo',
-			data: userInfo
-		})
+	saveUserInfo(userInfo) {
+		uni.setStorageSync('userInfo', userInfo)
 	},
-	
+
 	//获取用户id
-	getUserid(){
-		var id = undefined;
-		uni.getStorage({
-			key:'userInfo',
-			success(res) {
-				id = res.data.id
+	getUserid() {
+		try {
+			const userInfo = uni.getStorageSync('userInfo');
+			if (userInfo && userInfo.id) {
+				return userInfo.id;
 			}
-		})
-		return id
+			return undefined;
+		} catch (error) {
+			console.error('获取用户ID失败:', error);
+			return undefined;
+		}
 	},
-	
+
 	//获取用户信息
-	getUserInfo(){
-		const userInfo = uni.getStorageSync("userInfo")
-		return userInfo?userInfo:undefined
-		
+	getUserInfo() {
+		try {
+			const userInfo = uni.getStorageSync("userInfo");
+			
+			return userInfo || undefined;
+		} catch (error) {
+			console.error('获取用户信息失败:', error);
+			return undefined;
+		}
+
 	},
-	
+
 	//用户退出登录
-	clearUserInfo(){
+	clearUserInfo() {
 		uni.removeStorageSync('userInfo');
 		http.clearToken();
 	},
-	
+
 }

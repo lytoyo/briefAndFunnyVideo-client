@@ -5,9 +5,7 @@
 		<file-picker ref="filePicker" :maxImageCount="maxImageCount" :maxVideoCount="maxVideoCount"
 			@select="onFileSelect" @remove="onFileRemove" @change="onFileChange" />
 		<button @click="uploadFile()">{{$t('chunkUploader.uploadBlog')}}</button>
-		<button @click="clearMer()">清除缓存</button>
 	</view>
-	
 </template>
 
 <script>
@@ -16,9 +14,12 @@
 	import FilePicker from '@/components/file-picker/index.vue'
 	import appConfig from '@/config/index.js'
 	import {
-		uploadFileZone
+		smallFileUpload,
+		uploadFileZone,
+		uploadZone
 	} from '@/utils/file/file.js'
 	import http from '@/utils/request.js'
+	
 	export default {
 		components: {
 			FilePicker,
@@ -55,9 +56,6 @@
 		},
 		
 		methods: {
-			clearMer(){
-				http.clearToken()
-			},
 			// 文件选择回调
 			onFileSelect(files) {
 				files.files.forEach(file => {
@@ -96,118 +94,133 @@
 			},
 			//上传博客
 			async uploadFile() {
-				if (this.uploadQueue.length > 0) {
-					var filesInfo = []
-					const FileSpliter = uni.requireNativePlugin("Forke-FileSpliter");
-					for (var i = 0; i < this.uploadQueue.length; i++) {
-						const fileInfo = this.uploadQueue[i].file;
-						var md5 = Number(Math.random().toString().substr(5, 10) + Date.now()).toString(36)
-						var fileName = md5 + fileInfo.suffix
-						this.uploadQueue[i] = {
-							...this.uploadQueue[i],
-							fileName:fileName
-						}
-						//文件大小小于1M，直接上传
-						if (fileInfo.size < this.chunkSize) {
-							var fileMsg = {
-								"md5": md5,
-								"suffix": fileInfo.suffix,
-								"size": fileInfo.size,
-								"type": fileInfo.type,
-							}
-							if (fileInfo.type === 'video') {
-								fileMsg = {
-									...fileMsg,
-									"width": fileInfo.width,
-									"height": fileInfo.height,
-									"duration": fileInfo.duration,
-								}
-							}
-							//直接上传
-							uni.uploadFile({
-								url: appConfig.BASE_URL+'server/file/smallFileUpload',
-								filePath: fileInfo.path,
-								name: 'file',
-								header: {
-									"Authorization": http.authConfig
-										.tokenPrefix + http.getToken()
-								},
-								formData: {
-									...fileMsg
-								},
-								success(res) {
-									this.currentFinishedUploads += 1
-								}
-							})
-							//上传进度+1
-						} 
-						//文件大小大于1M，分片上传
-						else {
-							let formdata = {
-								"hashCode": md5,
-								"suffix": fileInfo.suffix, //文件后缀
-								'size': fileInfo.size, //文件大小
-								'chunkSize': this.chunkSize, //分片大小 1m
-								'chunkCount': Math.ceil(fileInfo.size / this.chunkSize), //分片次数  
-							}
-							plus.io.resolveLocalFileSystemURL(fileInfo.path, (entry) => {
-								entry.file((file) => {
-									FileSpliter.splitFile({
-										filePath: file.fullPath,
-										savePath: plus.io.convertLocalFileSystemURL("_doc/FileSpliter"),
-										fileName: file.name,
-										chunkSize: this.chunkSize
-									}, (ret) => {
-										if (ret) {
-											if (ret.code == 'process') {
-												uni.uploadFile({
-													url: 'http://10.99.21.126:8884/server/file/uploadZone',
-													filePath: ret.path, //切片返回的路径
-													name: 'file',
-													header: {
-														"Authorization": http.authConfig.tokenPrefix + http.getToken()
-													},
-													formData: {
-														"md5": formdata.hashCode,
-														'chunkIndex': ret.chunk, //分片序号
-													}
-												})
-											} else if (ret.code == 'complete') {
-												this.currentFinishedUploads += 1
-												this.deleteFiles(file.name)
-											} else if (ret.code == 'start') {
-											}
-										}
-									})
-								}, (ret) => {
-									//失败回调
-								})
-							})
-							var fileMsg = {
-								"md5": formdata.hashCode,
-								"suffix": formdata.suffix,
-								"size": formdata.size,
-								"type": fileInfo.type,
-								"chunkCount": formdata.chunkCount
-							}
-							if (fileInfo.type === 'video') {
-								fileMsg = {
-									...fileMsg,
-									"width": fileInfo.width,
-									"height": fileInfo.height,
-									"duration": fileInfo.duration,
-								}
-							}
-							filesInfo.push(fileMsg)
-						}
-					}
-				}	
-				//告知父组件文件全部上传完毕，并返回需要进行分片合并的文件信息
-				this.$emit("uploadFileComplate", {
-					filesInfo: filesInfo,
-					uploadQueue: this.uploadQueue
-				})
-				uni.hideLoading()
+			  if (this.uploadQueue.length > 0) {
+			    var filesInfo = []
+			    const FileSpliter = uni.requireNativePlugin("Forke-FileSpliter");
+			    
+			    // 存储所有异步操作
+			    const uploadPromises = []
+			    
+			    for (let i = 0; i < this.uploadQueue.length; i++) {
+			      const fileInfo = this.uploadQueue[i].file;
+			      var md5 = Number(Math.random().toString().substr(5, 10) + Date.now()).toString(36)
+			      var fileName = md5 + fileInfo.suffix
+			      this.uploadQueue[i] = {
+			        ...this.uploadQueue[i],
+			        fileName: fileName
+			      }
+
+			      // 文件大小小于20M，直接上传
+			      if (fileInfo.size < 20 * 1024 * 1024) {
+			        var fileMsg = {
+			          "md5": md5,
+			          "suffix": fileInfo.suffix,
+			          "size": fileInfo.size,
+			          "type": fileInfo.type,
+			        }
+			        
+			        if (fileInfo.type === 'video') {
+			          fileMsg = {
+			            ...fileMsg,
+			            "width": fileInfo.width,
+			            "height": fileInfo.height,
+			            "duration": fileInfo.duration,
+			          }
+			        }
+			        
+			        // 将小文件上传包装为Promise
+			        const smallFilePromise = new Promise((resolve) => {
+			          smallFileUpload(fileInfo.path, fileMsg, {}).then(res => {
+			            this.uploadQueue[i].fileName = res
+						
+			            resolve()
+			          }).catch(() => resolve()) // 即使出错也要继续
+			        })
+			        uploadPromises.push(smallFilePromise)
+			      } 
+			      // 文件大于20M，分片上传
+			      else {
+			        let formdata = {
+			          "hashCode": md5,
+			          "suffix": fileInfo.suffix,
+			          'size': fileInfo.size,
+			          'chunkSize': this.chunkSize,
+			          'chunkCount': Math.ceil(fileInfo.size / this.chunkSize),
+			        }
+			        
+			        // 将大文件上传包装为Promise
+			        const largeFilePromise = new Promise((resolve, reject) => {
+			          plus.io.resolveLocalFileSystemURL(fileInfo.path, (entry) => {
+			            entry.file((file) => {
+			              const chunkPromises = []
+			              
+			              FileSpliter.splitFile({
+			                filePath: file.fullPath,
+			                savePath: plus.io.convertLocalFileSystemURL("_doc/FileSpliter"),
+			                fileName: file.name,
+			                chunkSize: this.chunkSize
+			              }, (ret) => {
+			                if (ret) {
+			                  if (ret.code == 'process') {
+			                    // 存储每个分片上传的Promise
+			                    const chunkPromise = uploadZone(ret.path, {
+			                      "md5": formdata.hashCode,
+			                      'chunkIndex': ret.chunk,
+			                    }, {}).then(zoneRes => {
+			                      console.log(zoneRes)
+			                    })
+			                    chunkPromises.push(chunkPromise)
+			                  } else if (ret.code == 'complete') {
+			                    // 等待所有分片上传完成
+			                    Promise.all(chunkPromises).then(() => {
+			                      this.currentFinishedUploads += 1
+			                      this.deleteFiles(file.name)
+			                      
+			                      var fileMsg = {
+			                        "md5": formdata.hashCode,
+			                        "suffix": formdata.suffix,
+			                        "size": formdata.size,
+			                        "type": fileInfo.type,
+			                        "chunkCount": formdata.chunkCount
+			                      }
+			                      
+			                      if (fileInfo.type === 'video') {
+			                        fileMsg = {
+			                          ...fileMsg,
+			                          "width": fileInfo.width,
+			                          "height": fileInfo.height,
+			                          "duration": fileInfo.duration,
+			                        }
+			                      }
+			                      
+			                      filesInfo.push(fileMsg)
+			                      resolve()
+			                    }).catch(() => resolve()) // 即使出错也要继续
+			                  } else if (ret.code == 'start') {
+			                    // 开始处理
+			                  }
+			                }
+			              })
+			            }, (ret) => {
+			              reject(ret)
+			            })
+			          })
+			        })
+			        uploadPromises.push(largeFilePromise)
+			      }
+			    }
+			    
+			    // 等待所有文件上传完成
+			    await Promise.all(uploadPromises)
+				
+				
+			    // 所有上传完成后才触发事件
+			    this.$emit("uploadFileComplate", {
+			      filesInfo: filesInfo,
+			      uploadQueue: this.uploadQueue
+			    })
+			  }
+			  uni.hideLoading()
 			},
 			deleteFiles(fileName) {
 				const FileSpliter = uni.requireNativePlugin('Forke-FileSpliter');

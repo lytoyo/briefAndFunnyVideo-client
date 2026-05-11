@@ -161,7 +161,7 @@
 				commentTotal : 0,
 				commentFlag :true,
 				size: 5,
-				type: 2,
+				type: 1,
 				value:1,
 				range:[
 					{value:1,text:"全部评论"},
@@ -173,7 +173,10 @@
 				fileList:[],
 				newCommentIdList:[],
 				mediaFlag:0, //0-纯文字 1-图文 2-视频
-				placeholder:"说说什么吧"
+				placeholder:"说说什么吧",
+				commentSubmitting: false,
+				isOpenInput:false,
+				isPostComment:false
 			}
 		},
 		onReachBottom() {
@@ -254,6 +257,12 @@
 				}) 
 			},
 			postComment(){
+				if(this.commentSubmitting) return;	
+				
+				if(!this.remark.trim() && this.fileList.length === 0) return;
+				
+				this.commentSubmitting = true
+				
 				let data = {
 					postId:this.postDetail.id,
 					parentId:0,
@@ -278,6 +287,8 @@
 					        duration: 300
 					    })
 					})
+				}).finally(()=>{
+					this.commentSubmitting = false
 				})
 			},
 			mergeStr(){
@@ -285,6 +296,8 @@
 				return str
 			},
 			openInput(){
+				if(this.isOpenInput) return
+				this.isOpenInput = true
 				uni.$emit('openInput',{
 					postId:this.postDetail.id,
 					parentId:0,
@@ -320,6 +333,9 @@
 						})
 					})
 				})
+				setTimeout(()=>{
+					this.isOpenInput = false
+				},800)
 			},
 			previewImage(currentIndex) {
 				const urls = this.fileList.map(file => file.fileUrl)
@@ -389,9 +405,7 @@
 			border-bottom: solid 1rpx #dfdfdf;
 			background-color: white;
 			
-			
-			.return-button{
-				
+			.return-button{	
 				width: 125rpx;
 				height:100%; 
 				display: flex;
@@ -464,7 +478,6 @@
 						width: 250rpx;
 						padding-left: 20rpx;
 						position: relative;
-						background-color: aqua;
 						.preview-img{
 							height: 100%;
 							width: 100%;

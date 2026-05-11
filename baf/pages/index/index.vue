@@ -7,10 +7,12 @@
 			<cover-view v-for="(item, index) in items" :key="index" :class="['tab-item', {active: current === index}]"
 				@tap="onTabChange(index)">
 				<cover-view v-if="index !== 3">{{item}}</cover-view> 
-				<cover-image v-else src="/static/search.png" class="tab-icon"></cover-image>
+				
 			</cover-view> 
 		</cover-view>
-
+		<cover-view class="search-block">
+			<cover-image src="/static/search.png" class="search-icon" @click="searchPost()"></cover-image>
+		</cover-view>
 		<!-- 内容区域 -->
 		<view class="content">
 			<!-- 推荐页 -->
@@ -50,6 +52,7 @@
 						:id="post.id" :current="current" @like-click="onClickLike" @collect-click="onClickCollect" />
 				</view> 
 			</view>
+			
 		</view>
 	</view>
 </template> 
@@ -66,7 +69,7 @@
 		data() {
 			return {
 				current: 0,
-				items: ['推荐', '视频', '图文'],
+				items: ['推荐', '视频', '图文',''],
 				size: 5,
 				recommendPostList: [],
 				recommendCurrent: 1,
@@ -81,7 +84,8 @@
 				imaTextPostList:[],
 				imaTextCurrent:1,
 				imaTextPages:0,
-				imaTextFlag:true
+				imaTextFlag:true,
+				isSkip:false
 			}
 		},
 		mounted() {
@@ -135,14 +139,35 @@
 			},
 			
 			onTabChange(index) {
+				if(index === 3){
+					uni.navigateTo({
+						url:'/pages/search/search'
+					})
+					return
+				}
 				this.current = index;
 				if(this.current === 1 && this.videoPostList.length === 0){
 					this.getPost('video',this.videoCurrent)
 				}else if(this.current === 2 && this.imaTextPostList.length === 0){
 					this.getPost('image',this.imaTextCurrent)
 				}
+				
+				
 			},
-			 
+			
+			searchPost(){
+				if(this.isSkip) return
+				this.isSkip = true
+				uni.navigateTo({
+					url:'/pages/search/search',
+					complete:()=> {
+						setTimeout(()=>{
+							this.isSkip = false
+						},800)
+					}
+				})
+			},
+			
 			onClickLike(blogVo,current,postIndex){
 				likedHandle(blogVo,{}).then(res=>{
 					
@@ -230,7 +255,22 @@
 				}
 			}
 		}
-
+		
+		.search-block{
+			position: fixed;
+			top: 120rpx;
+			right: 77rpx;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			width: 80rpx;
+			height: 80rpx;
+			.search-icon{
+				width: 40rpx;
+				height: 40rpx;
+			}
+		}
+		
 		.content {
 			
 			padding-top: calc(var(--status-bar-height) + 130rpx);

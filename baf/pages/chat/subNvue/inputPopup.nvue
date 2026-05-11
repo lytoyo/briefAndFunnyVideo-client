@@ -1,0 +1,136 @@
+<template>
+	<view :style="inputContainer">
+		<view :style="inputSendDisplayBlock">
+			<view :style="inputSendStatusBlock">
+				<view :style="inputSendBlock">
+					<view :style="inputBlock">
+						<input v-model="content" ref="content" :focus="isFocused"
+						 @keyboardheightchange="boardHeightChange"/>
+					</view>
+				</view>
+				<view :style="statusBlock">
+					<image v-if="content !== null && content.trim() !== ''" src="/static/sendable.png" :style="imageStyle"></image>
+					<image v-else src="/static/send.png" :style="imageStyle" @click="postComment"></image>
+				</view>
+				<view :style="statusBlock">
+					<image src="/static/fileChoose.png" :style="imageStyle" @click="chooseChatFile"></image>
+				</view>
+			</view>
+		</view>
+	</view>
+</template>
+
+<script>
+	import { getDeviceInfo } from '@/utils/device/device.js'
+	import { uploadCommentFile } from '@/utils/file/file.js'
+	import {comment} from '@/utils/blog/blog.js'
+	export default {
+		created(){  
+			this.device = getDeviceInfo()
+			uni.$on('openInput',(data)=>{
+				this.init(data)
+				setTimeout(() => {
+					this.isFocused = true;
+					this.$nextTick(() => {
+						if (this.$refs.content) {
+							this.$refs.content.focus();
+						}
+					});
+				}, 300);
+			})
+		},
+		watch:{
+			content:function(newVal,oldVal){
+				uni.$emit('changeInputVal',{
+					content:newVal
+				})
+			}
+		},
+		computed:{
+			inputContainer(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					widht:device.windowWidth + 'px',
+					backgroundColor:'white'
+				}
+			},
+			inputSendDisplayBlock(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.percentToPx(100) + 'px',
+					height:device.rpxToPx(380) + 'px',
+					
+				}
+			},
+			inputSendStatusBlock(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.rpxToPx(750) + 'px',
+					height:device.rpxToPx(80) + 'px',
+					display:'flex',
+					flexDirection:'row',
+					marginTop:device.rpxToPx(25) + 'px',
+				}
+			},
+			inputSendBlock(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.rpxToPx(520) + 'px',
+					height:device.rpxToPx(80) + 'px',
+					marginLeft:device.rpxToPx(30) + 'px',
+				}
+			},
+			inputBlock(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.rpxToPx(520) + 'px',
+					height:device.rpxToPx(80) + 'px',
+					backgroundColor:'#d9d9d9',
+					padding:device.rpxToPx(15) + 'px',
+				}
+			},
+			
+			statusBlock(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.rpxToPx(80) + 'px',
+					height:device.rpxToPx(80) + 'px',
+					marginLeft:device.rpxToPx(10) + 'px',
+					display:'flex',
+					justifyContent: 'center',
+					alignItems: 'center',
+				}
+			},
+			imageStyle(){
+				const device = this.device
+				if(!device) return {}
+				return {
+					width:device.rpxToPx(70) + 'px',
+					height:device.rpxToPx(70) + 'px',
+				}
+			}
+		},
+		methods:{
+			init(data){
+				this.content = data.content
+				this.p2pId = data.p2pId
+				this.otherId = data.otherId
+				
+			},
+		},
+		data(){
+			return{
+				content:null,
+				p2pId:null,
+				otherId:null,
+				isFocused:true
+			}
+		}
+	}
+</script>
